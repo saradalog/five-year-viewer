@@ -14,7 +14,7 @@
 | このリポジトリ（公開） | 画面だけ：`index.html`（1枚、ビルド不要）、`manifest.webmanifest`、`icons/`。データは置かない |
 | 持ち主のPC `C:\Users\tomoy\jquants_data\_scripts\five_year\` | データを作るPython（`update_app.sh` がまとめ役）と `apps_script/Code.gs` |
 | Googleドライブのフォルダ「全銘柄5年ビューア_データ」 | `fyv_jp.json.gz`・`fyv_us.json.gz`・`fyv_hk.json.gz`・`fyv_meta.json`（同じ名前が複数あれば一番新しいものを使う） |
-| スプレッドシート「全銘柄_直近5年_財務と株価_日米中」 | 「評価」タブ（キー・国・コード・銘柄名・評価・更新日時） |
+| スプレッドシート「全銘柄_直近5年_財務と株価_日米中」 | 「評価」タブ（キー・国・コード・銘柄名・評価・更新日時・メモ）。評価もメモも空になった行は消える |
 | Apps Script（`Code.gs`） | ドライブのデータを返し、評価を保存する。合言葉は `'ここに合言葉'` に伏せてPCに置いてある。直したら持ち主が Apps Script エディタに貼り、合言葉を入れ直して「新バージョン」でデプロイし直す。このリポジトリには置かない |
 
 ## Apps Script との約束（`api()` 関数）
@@ -25,8 +25,9 @@
 |---|---|
 | `ping` / `meta` | 接続確認と `fyv_meta.json`（株価の日付・更新時刻） |
 | `data`（`m=jp/us/hk`） | その国のデータ。gzipしたJSONをbase64で返す。端末の IndexedDB（`five-year-viewer` の `kv`、キー `data-jp` など）に `meta.built` 付きで保存し、`built` が変わったときだけ受け取り直す |
-| `marks` | 評価の一覧 `{ "jp_7203": "a", ... }` |
+| `marks` | 評価とメモの一覧 `{ marks: { "jp_7203": "a" }, notes: { "jp_7203": "…" }, v: 2 }`（`v` が無い古い Apps Script はメモ未対応） |
 | `mark`（POST、本文JSON） | 評価の保存・削除（`key`・`mark`＝A〜Dまたは空・`code`・`name`）。送れなかった分は localStorage（`fyv-pending`）に残して次に送る |
+| `note`（POST、本文JSON） | 自分のメモの保存・削除（`key`・`note`・`code`・`name`）。端末には `fyv-notes`、送信待ちは `fyv-pending-notes` |
 
 ## データの形（1社＝1配列）
 

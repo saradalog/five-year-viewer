@@ -101,6 +101,9 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:760px;margin:0 auto}
 .seg-bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
 .seg-v small{color:var(--muted);font-size:11px}
 .ovv{margin:0}.ovv .num{font-size:18px;font-weight:500}
+.memo{grid-column:1/3;font-size:12px;color:var(--ink);background:var(--accent-soft);border-radius:6px;padding:4px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memo-panel textarea{width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;line-height:1.6;resize:vertical;min-height:96px}
+.memo-panel .note{margin:4px 0 0;min-height:1.2em}
 .rs{margin:6px 0}.rs b{font-size:13px}.rs p{margin:2px 0 0;font-size:14px;line-height:1.7;white-space:pre-wrap}
 #cfg{position:fixed;inset:0;z-index:30;background:var(--paper);overflow-y:auto;display:none}
 #cfg.open{display:block}
@@ -150,7 +153,7 @@ body{overflow-x:hidden}
     <button type="button" data-mkt="hk" aria-pressed="false">香港<small id="n-hk">900社</small></button>
   </div>
   <div class="row">
-    <input id="q" type="search" placeholder="コード・銘柄名・業種・事業内容で探す" autocomplete="off">
+    <input id="q" type="search" placeholder="コード・銘柄名・業種・事業内容・メモで探す" autocomplete="off">
     <select id="sort" aria-label="並び替え">
       <option value="code">コード順</option>
       <option value="mc">時価総額が大きい順</option>
@@ -170,6 +173,7 @@ body{overflow-x:hidden}
     <button class="chip" type="button" data-f="profit" aria-pressed="false">黒字</button>
     <button class="chip" type="button" data-f="ov30" aria-pressed="false">海外比率30%+</button>
     <button class="chip" type="button" data-f="rs" aria-pressed="false">調査済み</button>
+    <button class="chip" type="button" data-f="memo" aria-pressed="false">メモあり</button>
     <button class="chip" type="button" data-m="a" aria-pressed="false">Aだけ</button>
     <button class="chip" type="button" data-m="b" aria-pressed="false">Bだけ</button>
     <button class="chip" type="button" data-m="c" aria-pressed="false">Cだけ</button>
@@ -298,7 +302,7 @@ function ratioClass(r){return r==null?'':r<0.8?'good':r>1.25?'bad':''}
 function apply(){
   const all=DATA[mkt]||[]; const q=st.q.trim().toLowerCase();
   let v=all.filter(o=>{
-    if(q && !o.key.includes(q)) return false;
+    if(q && !o.key.includes(q) && !((notes[mkt+'_'+o.c]||'').toLowerCase().includes(q))) return false;
     const f=st.f;
     if(f.has('cheapFv')&&!(o.rfv!=null&&o.rfv<1)) return false;
     if(f.has('cheapFa')&&!(o.rfa!=null&&o.rfa<1)) return false;
@@ -308,6 +312,7 @@ function apply(){
     if(f.has('profit')&&!(o.np!=null&&o.np>0)) return false;
     if(f.has('ov30')&&!(o.ov!=null&&o.ov>=30)) return false;
     if(f.has('rs')&&!(o.ex&&o.ex.rs)) return false;
+    if(f.has('memo')&&!notes[mkt+'_'+o.c]) return false;
     const mk=marks[mkt+'_'+o.c];
     if(st.m==='none'&&mk) return false;
     if(st.m&&st.m!=='none'&&mk!==st.m) return false;
@@ -341,7 +346,7 @@ function cardHTML(o){
       <span class="pills">${p1}${p2}</span>
     </button>
     <div class="cright"><span class="price">${fmtPx(o.p)}<span class="sub"> ${MK[mkt].px}</span></span>${markBtns(o.c,mk)}</div>
-    <div class="spark">${spark(o.f[0])}<span>売上5期</span>${g}${opm}</div>
+    <div class="spark">${spark(o.f[0])}<span>売上5期</span>${g}${opm}</div>${memoHTML(o.c)}
   </article>`;
 }
 function markBtns(c,mk){
@@ -427,6 +432,9 @@ function openDetail(c,push=true){
     <div class="dtitle"><h2>${esc(o.n)}</h2>
       <div class="cinfo">${o.s?`<span>${esc(o.s)}</span>`:''}<span>${esc(o.m)}</span><span>最新期 ${o.l||'—'}</span><span>${mkt==='jp'?'会計基準 ':'決算の通貨 '}${esc(o.ccy)}</span></div></div>
     <div class="row" style="justify-content:space-between"><span class="price" style="font-size:22px">${fmtPx(o.p)} <span class="sub">${M.px}（${M.date}）</span></span>${markBtns(o.c,mk)}</div>
+    <div class="panel memo-panel"><h3><label for="memo">自分のメモ</label></h3>
+      <textarea id="memo" rows="4" placeholder="気づいたこと、監視に入れる理由、確かめたいことなど">${esc(notes[mkt+'_'+o.c]||'')}</textarea>
+      <p class="note" id="memoSt"></p></div>
     <div class="tiles">
       <div class="tile"><div class="k">時価総額</div><div class="v">${fmtMoney(o.mc)}</div><div class="s sub">${M.mc}</div></div>
       <div class="tile"><div class="k">売上の伸び（年平均）</div><div class="v">${o.g==null?'—':(o.g>=0?'+':'')+fmt(o.g,1)+'%'}</div><div class="s sub">営業利益率 ${o.opm==null?'—':fmt(o.opm,1)+'%'}</div></div>
@@ -438,11 +446,15 @@ function openDetail(c,push=true){
     <div class="panel"><h3>株価（各期末と現在、${M.px}）</h3>${chartLine(o)}</div>
     <div class="panel"><h3>5期の数字</h3><div class="tablewrap"><table><thead><tr><th>項目</th>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
       <p class="note">${mkt==='jp'?'EPS・期末株価は株式分割を今の株数に合わせて調整。人件費は販管費の内訳を出している会社だけ。':mkt==='us'?'税引前利益は経常利益の代わり。EPSは分割調整済み。ドル以外の決算の会社は株価関係を空欄にしています。':'税引前利益は経常利益の代わり。決算の通貨は配当から推定。「不明」は香港ドル決算とみなして理論・適正株価を計算。'}</p></div>`;
+  const ta=document.getElementById('memo'); let mt;
+  ta.addEventListener('input',()=>{ clearTimeout(mt); mt=setTimeout(()=>setNote(o.c,ta.value),1500); document.getElementById('memoSt').textContent='入力中…' });
+  ta.addEventListener('blur',()=>{ clearTimeout(mt); setNote(o.c,ta.value); noteStatus(mkt+'_'+o.c) });
+  noteStatus(mkt+'_'+o.c);
   const d=document.getElementById('detail'); d.classList.add('open'); d.scrollTop=0;
   document.body.style.overflow='hidden';
   if(push && location.hash!=='#detail'){ try{ location.hash='detail' }catch(e){} }
 }
-function closeDetail(){document.getElementById('detail').classList.remove('open');document.body.style.overflow='';cur=null}
+function closeDetail(){const ta=document.getElementById('memo'); if(ta&&cur) setNote(cur.c,ta.value);document.getElementById('detail').classList.remove('open');document.body.style.overflow='';cur=null}
 window.addEventListener('hashchange',()=>{ if(location.hash!=='#detail') closeDetail() });
 document.getElementById('back').addEventListener('click',()=>{ if(location.hash==='#detail') history.back(); else closeDetail(); setTimeout(()=>{if(cur) closeDetail()},250) });
 
@@ -453,6 +465,11 @@ function lsLoad(){try{const s=localStorage.getItem('fiveyear_marks'); if(s){mark
 function lsSave(){try{localStorage.setItem('fiveyear_marks',JSON.stringify(marks))}catch(e){}}
 // 評価はApps Script経由でスプレッドシート「評価」タブに保存。送れなかった分は端末に残して次に送る
 let pending={}; try{pending=JSON.parse(localStorage.getItem('fyv-pending')||'{}')}catch(e){}
+// メモ（評価と同じ「評価」タブのメモ列に保存。送れなかった分は端末に残して次に送る）
+let notes={}; try{notes=JSON.parse(localStorage.getItem('fyv-notes')||'{}')}catch(e){}
+let pendNotes={}; try{pendNotes=JSON.parse(localStorage.getItem('fyv-pending-notes')||'{}')}catch(e){}
+let noteOld=false;
+function notesSave(){try{localStorage.setItem('fyv-notes',JSON.stringify(notes));localStorage.setItem('fyv-pending-notes',JSON.stringify(pendNotes))}catch(e){}}
 function pendSave(){try{localStorage.setItem('fyv-pending',JSON.stringify(pending))}catch(e){}}
 let flushing=false;
 async function flush(){
@@ -463,7 +480,14 @@ async function flush(){
       try{ await api('mark',null,{key:k,mark:(p.mark||'').toUpperCase(),code:p.code,name:p.name}); if(pending[k]===p) delete pending[k]; pendSave() }
       catch(e){ setSync(e.code==='nocfg'?'評価はこの端末に保存（設定でつなぐと同期）':'評価の送信待ち '+Object.keys(pending).length+'件'); break }
     }
-    if(!Object.keys(pending).length) setSync('評価はスプレッドシートと同期');
+    for(const k of Object.keys(pendNotes)){
+      const p=pendNotes[k];
+      try{ await api('note',null,{key:k,note:p.note,code:p.code,name:p.name}); if(pendNotes[k]===p) delete pendNotes[k]; notesSave(); noteStatus(k) }
+      catch(e){ if(e.code==='api'&&/bad_action/.test(e.message)){ noteOld=true; noteStatus(k) } break }
+    }
+    const n=Object.keys(pending).length+Object.keys(pendNotes).length;
+    if(!n) setSync('評価とメモはスプレッドシートと同期');
+    else if(noteOld) setSync('メモを送るには、Apps Scriptのコードを新しくしてください');
   } finally { flushing=false }
 }
 function setSync(t){document.getElementById('sync').textContent=t}
@@ -475,14 +499,33 @@ async function setMark(c,v){
   pending[k]={mark:nv||'',code:c,name:o?o.n:''}; pendSave();
   flush();
 }
+function setNote(c,text){
+  const k=mkt+'_'+c; const v=String(text||'').replace(/\s+$/,'');
+  if((notes[k]||'')===v) return;
+  if(v) notes[k]=v; else delete notes[k];
+  const o=(DATA[mkt]||[]).find(x=>x.c===c);
+  pendNotes[k]={note:v,code:c,name:o?o.n:''}; notesSave(); noteStatus(k);
+  const card=document.querySelector(`.card[data-c="${CSS.escape(c)}"] .memo`); if(card) card.outerHTML=memoHTML(c);
+  else { const el=document.querySelector(`.card[data-c="${CSS.escape(c)}"]`); if(el&&v) el.insertAdjacentHTML('beforeend',memoHTML(c)) }
+  flush();
+}
+function noteStatus(k){
+  const el=document.getElementById('memoSt'); if(!el||!cur||(mkt+'_'+cur.c)!==k) return;
+  el.textContent=noteOld?'この端末に保存しました（Apps Scriptのコードを新しくすると同期されます）':pendNotes[k]?'送信中…（つながらないときは端末に残して後で送ります）':(notes[k]?'スプレッドシートに保存しました':'');
+}
+function memoHTML(c){ const t=notes[mkt+'_'+c]; return t?`<div class="memo">📝 ${esc(t.split('\n')[0].slice(0,80))}${t.length>80||t.includes('\n')?'…':''}</div>`:'' }
+function DATA_notes_refresh(){ document.querySelectorAll('.card').forEach(el=>{ const m=el.querySelector('.memo'); const h=memoHTML(el.dataset.c); if(m) m.outerHTML=h||''; else if(h) el.insertAdjacentHTML('beforeend',h) }); if(cur){ const ta=document.getElementById('memo'); if(ta&&document.activeElement!==ta) ta.value=notes[mkt+'_'+cur.c]||'' } }
 async function syncMarks(){
   try{
     const j=await api('marks');
     const remote={}; for(const [k,v] of Object.entries(j.marks||{})) remote[k]=norm(String(v).toLowerCase());
     for(const [k,p] of Object.entries(pending)){ if(p.mark) remote[k]=p.mark; else delete remote[k] }
     marks=remote; lsSave();
+    if(j.notes){ const rn={...j.notes}; for(const [k,p] of Object.entries(pendNotes)){ if(p.note) rn[k]=p.note; else delete rn[k] } notes=rn; noteOld=false }
+    else if(j.v!==2) noteOld=true;
+    notesSave(); DATA_notes_refresh();
     document.querySelectorAll('.card').forEach(el=>refreshMark(el.dataset.c)); if(cur) refreshMark(cur.c);
-    setSync(Object.keys(pending).length?'評価の送信待ち '+Object.keys(pending).length+'件':'評価はスプレッドシートと同期');
+    setSync(noteOld?'メモを同期するには、Apps Scriptのコードを新しくしてください':(Object.keys(pending).length?'評価の送信待ち '+Object.keys(pending).length+'件':'評価とメモはスプレッドシートと同期'));
     flush();
   }catch(e){ setSync(e.code==='nocfg'?'評価はこの端末に保存（設定でつなぐと同期）':'評価はこの端末に保存（同期できませんでした）') }
 }
@@ -547,7 +590,7 @@ document.getElementById('copyO').addEventListener('click',async()=>{
     lines.push(`【${MK[k].label}】`);
     for(const g of ['a','b','c','d']){
       const cs=ks.filter(x=>marks[x]===g).map(x=>x.slice(k.length+1)).sort(); if(!cs.length) continue;
-      lines.push(`${g.toUpperCase()}（${cs.length}社）`); cs.forEach(c=>lines.push(`  ${c} ${byC[c]||''}`.trimEnd()));
+      lines.push(`${g.toUpperCase()}（${cs.length}社）`); cs.forEach(c=>{ lines.push(`  ${c} ${byC[c]||''}`.trimEnd()); const n=notes[k+'_'+c]; if(n) lines.push('    メモ：'+n.replace(/\n/g,' ')) });
     }
   }
   if(!lines.length){toast('まだ評価した銘柄がありません');return}
