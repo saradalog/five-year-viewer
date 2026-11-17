@@ -112,6 +112,8 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:760px;margin:0 auto}
 .bn-ref{font-size:11px;color:var(--muted);white-space:nowrap}
 .bn-del{border:1px solid var(--line);background:var(--card);border-radius:8px;height:34px;color:var(--muted)}
 .bn-add{margin-top:8px;justify-self:start}
+.tb-sum{margin:6px 0 0;font-family:var(--font-num)}
+.tb-sum.warn{color:var(--bad)}
 .rs{margin:6px 0}.rs b{font-size:13px}.rs p{margin:2px 0 0;font-size:14px;line-height:1.7;white-space:pre-wrap}
 #cfg{position:fixed;inset:0;z-index:30;background:var(--paper);overflow-y:auto;display:none}
 #cfg.open{display:block}
@@ -310,7 +312,7 @@ function ratioClass(r){return r==null?'':r<0.8?'good':r>1.25?'bad':''}
 function apply(){
   const all=DATA[mkt]||[]; const q=st.q.trim().toLowerCase();
   let v=all.filter(o=>{
-    if(q && !o.key.includes(q) && !(((notes[mkt+'_'+o.c]||'')+' '+(biz[mkt+'_'+o.c]||'')).toLowerCase().includes(q))) return false;
+    if(q && !o.key.includes(q) && !(((notes[mkt+'_'+o.c]||'')+' '+(biz[mkt+'_'+o.c]||'')+' '+(TB.geo.data[mkt+'_'+o.c]||'')).toLowerCase().includes(q))) return false;
     const f=st.f;
     if(f.has('cheapFv')&&!(o.rfv!=null&&o.rfv<1)) return false;
     if(f.has('cheapFa')&&!(o.rfa!=null&&o.rfa<1)) return false;
@@ -320,7 +322,7 @@ function apply(){
     if(f.has('profit')&&!(o.np!=null&&o.np>0)) return false;
     if(f.has('ov30')&&!(o.ov!=null&&o.ov>=30)) return false;
     if(f.has('rs')&&!(o.ex&&o.ex.rs)) return false;
-    if(f.has('memo')&&!notes[mkt+'_'+o.c]&&!biz[mkt+'_'+o.c]) return false;
+    if(f.has('memo')&&!notes[mkt+'_'+o.c]&&!biz[mkt+'_'+o.c]&&!TB.geo.data[mkt+'_'+o.c]) return false;
     const mk=marks[mkt+'_'+o.c];
     if(st.m==='none'&&mk) return false;
     if(st.m&&st.m!=='none'&&mk!==st.m) return false;
@@ -407,7 +409,7 @@ function chartLine(o){
   return s+'</svg>';
 }
 function bizPanel(o,money){
-  const e=o.ex; if(!e) return '<div class="panel biz"><h3>事業の中身</h3><p class="note">事業内容のデータはまだありません（有価証券報告書・会社紹介を取得後に入ります）。</p><h4>事業ごとのメモ</h4><div id="bizNotes"></div></div>';
+  const e=o.ex; if(!e) return '<div class="panel biz"><h3>事業の中身</h3><p class="note">事業内容のデータはまだありません（有価証券報告書・会社紹介を取得後に入ります）。</p><h4>事業ごとのメモ</h4><div class="tb" data-kind="biz"></div><h4>販売国・地域と売上構成比</h4><div class="tb" data-kind="geo"></div></div>';
   let h='<div class="panel biz"><h3>事業の中身</h3>';
   if(e.ind||e.cty) h+=`<p class="note">${esc([e.ind,e.cty].filter(Boolean).join(' · '))}</p>`;
   if(e.d) h+=`<p class="desc">${esc(e.d)}</p>`;
@@ -415,7 +417,7 @@ function bizPanel(o,money){
   if(segs.length){
     h+='<h4>事業別売上（外部顧客への売上）</h4><div class="segs">'+segs.map(x=>`<div class="seg-row"><span class="seg-name">${esc(x[0])}</span><span class="seg-bar"><i style="width:${Math.max(2,Math.min(100,x[2]))}%"></i></span><span class="num seg-v">${fmt(x[2],0)}%${x[1]!=null?`<small> ${fmtMoney(x[1])}</small>`:''}</span></div>`).join('')+'</div>';
   }
-  h+='<h4>事業ごとのメモ</h4><div id="bizNotes"></div>';
+  h+='<h4>事業ごとのメモ</h4><div class="tb" data-kind="biz"></div><h4>販売国・地域と売上構成比</h4><div class="tb" data-kind="geo"></div>';
   if(e.ov!=null||e.ovn) h+=`<h4>海外比率</h4><p class="ovv"><span class="num">${e.ov!=null?fmt(e.ov,1)+'%':'—'}</span> <span class="note">${esc(e.ovn==='推定'?'（表から推定）':e.ovn==='海外10%未満'?'海外は売上の10%未満（有報で記載省略）':e.ovn==='海外売上なし'?'海外売上なし':e.ovn==='セグメントから計算'?'（地域セグメントから計算）':e.ovn||'')}</span></p>`;
   const r=e.rs;
   if(r){
@@ -463,7 +465,7 @@ function openDetail(c,push=true){
   document.body.style.overflow='hidden';
   if(push && location.hash!=='#detail'){ try{ location.hash='detail' }catch(e){} }
 }
-function closeDetail(){const ta=document.getElementById('memo'); if(ta&&cur) setNote(cur.c,ta.value); if(cur&&document.querySelector('#bizNotes .bn-row')){ clearTimeout(bizT); saveBiz(cur,collectBiz()) }document.getElementById('detail').classList.remove('open');document.body.style.overflow='';cur=null}
+function closeDetail(){const ta=document.getElementById('memo'); if(ta&&cur) setNote(cur.c,ta.value); saveAllTb();document.getElementById('detail').classList.remove('open');document.body.style.overflow='';cur=null}
 window.addEventListener('hashchange',()=>{ if(location.hash!=='#detail') closeDetail() });
 document.getElementById('back').addEventListener('click',()=>{ if(location.hash==='#detail') history.back(); else closeDetail(); setTimeout(()=>{if(cur) closeDetail()},250) });
 
@@ -478,14 +480,18 @@ let pending={}; try{pending=JSON.parse(localStorage.getItem('fyv-pending')||'{}'
 let notes={}; try{notes=JSON.parse(localStorage.getItem('fyv-notes')||'{}')}catch(e){}
 let pendNotes={}; try{pendNotes=JSON.parse(localStorage.getItem('fyv-pending-notes')||'{}')}catch(e){}
 let noteOld=false;
-// 事業ごとのメモ（行＝事業名・数字・メモ。スプレッドシートには1行ずつ「事業名 | 数字 | メモ」で保存）
-let biz={}; try{biz=JSON.parse(localStorage.getItem('fyv-biz')||'{}')}catch(e){}
-let pendBiz={}; try{pendBiz=JSON.parse(localStorage.getItem('fyv-pending-biz')||'{}')}catch(e){}
-let bizOld=false;
-function bizSave(){try{localStorage.setItem('fyv-biz',JSON.stringify(biz));localStorage.setItem('fyv-pending-biz',JSON.stringify(pendBiz))}catch(e){}}
+// 表のメモ（事業ごと・販売国ごと）。1行＝名前・数字・メモ。スプレッドシートには1行ずつ「名前 | 数字 | メモ」で保存
+const TB={
+  biz:{col:'事業メモ',title:'事業ごとのメモ',nameP:'事業名・製品',numP:'数字',memoP:'メモ（伸びる理由、単価・数量、シェアなど）',empty:'「＋ 行を追加」で、事業や製品ごとのメモを書けます。'},
+  geo:{col:'販売国メモ',title:'販売国・地域と売上構成比',nameP:'国・地域',numP:'構成比 %',memoP:'メモ（主な顧客、伸びている国など）',empty:'「＋ 行を追加」で、国・地域ごとの売上構成比を書けます。',pct:1}
+};
+for(const k in TB){ const t=TB[k]; try{t.data=JSON.parse(localStorage.getItem('fyv-'+k)||'{}')}catch(e){t.data={}} try{t.pend=JSON.parse(localStorage.getItem('fyv-pending-'+k)||'{}')}catch(e){t.pend={}} t.old=false; for(const p of Object.values(t.pend)) if(p&&p.t==null&&p[k]!=null) p.t=p[k] }   // 前の版の送信待ち（{biz:…}）を読み替え
+const biz=TB.biz.data;  // 一覧の表示・検索で使う
+function tbSave(k){try{localStorage.setItem('fyv-'+k,JSON.stringify(TB[k].data));localStorage.setItem('fyv-pending-'+k,JSON.stringify(TB[k].pend))}catch(e){}}
 const clean1=v=>String(v??'').replace(/\|/g,'｜').replace(/\r?\n/g,'↵').trim();
 function bizEncode(rows){ return rows.filter(r=>r.n||r.v||r.m).map(r=>[clean1(r.n),clean1(r.v),clean1(r.m)].join(' | ')).join('\n') }
 function bizDecode(t){ return String(t||'').split('\n').filter(Boolean).map(l=>{const p=l.split(' | '); return {n:p[0]||'',v:p[1]||'',m:(p.slice(2).join(' | ')||'').replace(/↵/g,'\n')}}) }
+const anyOld=()=>noteOld||TB.biz.old||TB.geo.old;
 function notesSave(){try{localStorage.setItem('fyv-notes',JSON.stringify(notes));localStorage.setItem('fyv-pending-notes',JSON.stringify(pendNotes))}catch(e){}}
 function pendSave(){try{localStorage.setItem('fyv-pending',JSON.stringify(pending))}catch(e){}}
 let flushing=false;
@@ -502,14 +508,16 @@ async function flush(){
       try{ await api('note',null,{key:k,note:p.note,code:p.code,name:p.name}); if(pendNotes[k]===p) delete pendNotes[k]; notesSave(); noteStatus(k) }
       catch(e){ if(e.code==='api'&&/bad_action/.test(e.message)){ noteOld=true; noteStatus(k) } break }
     }
-    for(const k of Object.keys(pendBiz)){
-      const p=pendBiz[k];
-      try{ await api('biz',null,{key:k,biz:p.biz,code:p.code,name:p.name}); if(pendBiz[k]===p) delete pendBiz[k]; bizSave(); bizStatus(k) }
-      catch(e){ if(e.code==='api'&&/bad_action/.test(e.message)){ bizOld=true; bizStatus(k) } break }
+    for(const kind of Object.keys(TB)){ const T=TB[kind];
+      for(const k of Object.keys(T.pend)){
+        const p=T.pend[k];
+        try{ await api(kind,null,{key:k,[kind]:p.t,code:p.code,name:p.name}); if(T.pend[k]===p) delete T.pend[k]; tbSave(kind); tbStatus(kind,k) }
+        catch(e){ if(e.code==='api'&&/bad_action/.test(e.message)){ T.old=true; tbStatus(kind,k) } break }
+      }
     }
-    const n=Object.keys(pending).length+Object.keys(pendNotes).length+Object.keys(pendBiz).length;
+    const n=Object.keys(pending).length+Object.keys(pendNotes).length+Object.keys(TB.biz.pend).length+Object.keys(TB.geo.pend).length;
     if(!n) setSync('評価とメモはスプレッドシートと同期');
-    else if(noteOld||bizOld) setSync('メモを送るには、Apps Scriptのコードを新しくしてください');
+    else if(anyOld()) setSync('メモを送るには、Apps Scriptのコードを新しくしてください');
   } finally { flushing=false }
 }
 function setSync(t){document.getElementById('sync').textContent=t}
@@ -531,36 +539,45 @@ function setNote(c,text){
   else { const el=document.querySelector(`.card[data-c="${CSS.escape(c)}"]`); if(el&&v) el.insertAdjacentHTML('beforeend',memoHTML(c)) }
   flush();
 }
-function bizRows(o){ const k=mkt+'_'+o.c; if(biz[k]!=null) return bizDecode(biz[k]); return ((o.ex&&o.ex.seg)||[]).filter(x=>x[0]).map(x=>({n:x[0],v:'',m:''})) }
-function renderBizNotes(o){
-  const box=document.getElementById('bizNotes'); if(!box) return;
-  const rows=bizRows(o); const segs=(o.ex&&o.ex.seg)||[];
-  const ref=n=>{ const s=segs.find(x=>x[0]===n); return s&&s[2]!=null?`有報 ${fmt(s[2],0)}%`:'' };
-  box.innerHTML='<div class="bn-list">'+rows.map(r=>bizRowHTML(r,ref(r.n))).join('')+'</div>'+
-    '<p class="note bn-empty"'+(rows.length?' hidden':'')+'>「＋ 行を追加」で、事業や製品ごとのメモを書けます。</p><button class="back bn-add" type="button">＋ 行を追加</button><p class="note" id="bizSt"></p>';
-  bizStatus(mkt+'_'+o.c);
+function tbTemplate(kind,o){
+  const e=o.ex||{};
+  if(kind==='biz') return (e.seg||[]).filter(x=>x[0]).map(x=>({n:x[0],v:'',m:''}));
+  if(kind==='geo'&&e.ov!=null) return [{n:'日本',v:String(Math.round((100-e.ov)*10)/10),m:''},{n:'海外',v:String(e.ov),m:''}].filter(r=>+r.v>0||r.n==='日本');
+  return [];
 }
-function bizRowHTML(r,ref){ return `<div class="bn-row">
-      <div class="bn-top"><input class="bn-n" aria-label="事業名" placeholder="事業名・製品" value="${esc(r.n)}"><span class="bn-ref">${ref||''}</span><input class="bn-v num" aria-label="数字" placeholder="数字" inputmode="decimal" value="${esc(r.v)}"><button class="bn-del" type="button" aria-label="この行を消す">×</button></div>
-      <textarea class="bn-m" rows="2" aria-label="メモ" placeholder="メモ（伸びる理由、単価・数量、シェアなど）">${esc(r.m)}</textarea></div>` }
-let bizT;
-function collectBiz(){ return [...document.querySelectorAll('#bizNotes .bn-row')].map(el=>({n:el.querySelector('.bn-n').value,v:el.querySelector('.bn-v').value,m:el.querySelector('.bn-m').value})) }
-function saveBiz(o,rows){
-  const k=mkt+'_'+o.c; const t=bizEncode(rows);
-  if((biz[k]??null)===t || (biz[k]==null && !t)) return;
-  biz[k]=t; pendBiz[k]={biz:t,code:o.c,name:o.n}; bizSave(); bizStatus(k); flush();
-  const card=document.querySelector(`.card[data-c="${CSS.escape(o.c)}"]`); if(card){ const m=card.querySelector('.memo'); const h=memoHTML(o.c); if(m) m.outerHTML=h||''; else if(h) card.insertAdjacentHTML('beforeend',h) }
+function tbRows(kind,o){ const k=mkt+'_'+o.c, T=TB[kind]; return T.data[k]!=null?bizDecode(T.data[k]):tbTemplate(kind,o) }
+function tbRef(kind,o,n){ if(kind!=='biz') return ''; const s=((o.ex&&o.ex.seg)||[]).find(x=>x[0]===n); return s&&s[2]!=null?`有報 ${fmt(s[2],0)}%`:'' }
+function tbRowHTML(kind,r,ref){ const T=TB[kind]; return `<div class="bn-row">
+      <div class="bn-top"><input class="bn-n" aria-label="${T.nameP}" placeholder="${T.nameP}" value="${esc(r.n)}"><span class="bn-ref">${ref||''}</span><input class="bn-v num" aria-label="${T.numP}" placeholder="${T.numP}" inputmode="decimal" value="${esc(r.v)}"><button class="bn-del" type="button" aria-label="この行を消す">×</button></div>
+      <textarea class="bn-m" rows="2" aria-label="メモ" placeholder="${T.memoP}">${esc(r.m)}</textarea></div>` }
+function tbSum(kind){ const box=document.querySelector(`.tb[data-kind="${kind}"]`); if(!box||!TB[kind].pct) return; const vs=[...box.querySelectorAll('.bn-v')].map(x=>parseFloat(String(x.value).replace(/[%％,]/g,''))).filter(x=>!isNaN(x)); const el=box.querySelector('.tb-sum'); if(!vs.length){el.textContent='';return} const s=Math.round(vs.reduce((a,b)=>a+b,0)*10)/10; el.textContent=`合計 ${s}%`+(Math.abs(s-100)>0.5?'（100%になっていません）':''); el.classList.toggle('warn',Math.abs(s-100)>0.5) }
+function renderTb(kind,o){
+  const box=document.querySelector(`.tb[data-kind="${kind}"]`); if(!box) return; const T=TB[kind];
+  const rows=tbRows(kind,o);
+  box.innerHTML='<div class="bn-list">'+rows.map(r=>tbRowHTML(kind,r,tbRef(kind,o,r.n))).join('')+'</div>'+
+    `<p class="note bn-empty"${rows.length?' hidden':''}>${T.empty}</p>${T.pct?'<p class="note tb-sum"></p>':''}<button class="back bn-add" type="button">＋ 行を追加</button><p class="note tb-st"></p>`;
+  tbSum(kind); tbStatus(kind,mkt+'_'+o.c);
 }
-function bizStatus(k){
-  const el=document.getElementById('bizSt'); if(!el||!cur||(mkt+'_'+cur.c)!==k) return;
-  el.textContent=bizOld?'この端末に保存しました（Apps Scriptのコードを新しくすると同期されます）':pendBiz[k]?'送信中…':(biz[k]?'スプレッドシートに保存しました':'');
+function renderBizNotes(o){ renderTb('biz',o); renderTb('geo',o) }
+const tbT={};
+function collectTb(kind){ return [...document.querySelectorAll(`.tb[data-kind="${kind}"] .bn-row`)].map(el=>({n:el.querySelector('.bn-n').value,v:el.querySelector('.bn-v').value,m:el.querySelector('.bn-m').value})) }
+function saveTb(kind,o,rows){
+  const k=mkt+'_'+o.c, T=TB[kind]; const t=bizEncode(rows);
+  if((T.data[k]??null)===t || (T.data[k]==null && !t)) return;
+  T.data[k]=t; T.pend[k]={t,code:o.c,name:o.n}; tbSave(kind); tbStatus(kind,k); flush();
+  if(kind==='biz'){ const card=document.querySelector(`.card[data-c="${CSS.escape(o.c)}"]`); if(card){ const m=card.querySelector('.memo'); const h=memoHTML(o.c); if(m) m.outerHTML=h||''; else if(h) card.insertAdjacentHTML('beforeend',h) } }
 }
-document.addEventListener('input',e=>{ if(!e.target.closest('#bizNotes')||!cur) return; clearTimeout(bizT); const o=cur; const st=document.getElementById('bizSt'); if(st) st.textContent='入力中…'; bizT=setTimeout(()=>saveBiz(o,collectBiz()),1500) });
-document.addEventListener('focusout',e=>{ if(!e.target.closest||!e.target.closest('#bizNotes')||!cur) return; clearTimeout(bizT); saveBiz(cur,collectBiz()) });
+function saveAllTb(){ if(!cur) return; for(const kind in TB){ clearTimeout(tbT[kind]); if(document.querySelector(`.tb[data-kind="${kind}"] .bn-list`)) saveTb(kind,cur,collectTb(kind)) } }
+function tbStatus(kind,k){
+  const el=document.querySelector(`.tb[data-kind="${kind}"] .tb-st`); if(!el||!cur||(mkt+'_'+cur.c)!==k) return; const T=TB[kind];
+  el.textContent=T.old?'この端末に保存しました（Apps Scriptのコードを新しくすると同期されます）':T.pend[k]?'送信中…':(T.data[k]?'スプレッドシートに保存しました':'');
+}
+document.addEventListener('input',e=>{ const box=e.target.closest&&e.target.closest('.tb'); if(!box||!cur) return; const kind=box.dataset.kind; clearTimeout(tbT[kind]); const o=cur; tbSum(kind); const st=box.querySelector('.tb-st'); if(st) st.textContent='入力中…'; tbT[kind]=setTimeout(()=>saveTb(kind,o,collectTb(kind)),1500) });
+document.addEventListener('focusout',e=>{ const box=e.target.closest&&e.target.closest('.tb'); if(!box||!cur) return; const kind=box.dataset.kind; clearTimeout(tbT[kind]); saveTb(kind,cur,collectTb(kind)) });
 document.addEventListener('click',e=>{
-  if(!cur) return;
-  if(e.target.closest('.bn-add')){ const list=document.querySelector('#bizNotes .bn-list'); list.insertAdjacentHTML('beforeend',bizRowHTML({n:'',v:'',m:''},'')); document.querySelector('#bizNotes .bn-empty').hidden=true; list.lastElementChild.querySelector('.bn-n').focus(); return }
-  const del=e.target.closest('.bn-del'); if(del){ del.closest('.bn-row').remove(); const rows=collectBiz(); const k=mkt+'_'+cur.c; if(!rows.length&&biz[k]==null){ biz[k]=''; bizSave() } else saveBiz(cur,rows); document.querySelector('#bizNotes .bn-empty').hidden=rows.length>0 }
+  if(!cur) return; const box=e.target.closest&&e.target.closest('.tb'); if(!box) return; const kind=box.dataset.kind;
+  if(e.target.closest('.bn-add')){ const list=box.querySelector('.bn-list'); list.insertAdjacentHTML('beforeend',tbRowHTML(kind,{n:'',v:'',m:''},'')); box.querySelector('.bn-empty').hidden=true; list.lastElementChild.querySelector('.bn-n').focus(); return }
+  const del=e.target.closest('.bn-del'); if(del){ del.closest('.bn-row').remove(); const rows=collectTb(kind); const k=mkt+'_'+cur.c, T=TB[kind]; if(!rows.length&&T.data[k]==null){ T.data[k]=''; tbSave(kind) } else saveTb(kind,cur,rows); box.querySelector('.bn-empty').hidden=rows.length>0; tbSum(kind) }
 });
 function noteStatus(k){
   const el=document.getElementById('memoSt'); if(!el||!cur||(mkt+'_'+cur.c)!==k) return;
@@ -576,12 +593,15 @@ async function syncMarks(){
     marks=remote; lsSave();
     if(j.notes){ const rn={...j.notes}; for(const [k,p] of Object.entries(pendNotes)){ if(p.note) rn[k]=p.note; else delete rn[k] } notes=rn; noteOld=false }
     else if(!j.v||j.v<2) noteOld=true;
-    if(j.biz){ const rb={...j.biz}; for(const [k,p] of Object.entries(pendBiz)){ if(p.biz) rb[k]=p.biz; else delete rb[k] } biz=rb; bizOld=false }
-    else bizOld=true;
-    bizSave(); if(cur&&!document.querySelector('#bizNotes :focus')) renderBizNotes(cur);
+    for(const kind of Object.keys(TB)){ const T=TB[kind];
+      if(j[kind]){ const r={...j[kind]}; for(const [k,p] of Object.entries(T.pend)){ if(p.t) r[k]=p.t; else delete r[k] } for(const k of Object.keys(T.data)) delete T.data[k]; Object.assign(T.data,r); T.old=false }
+      else T.old=true;
+      tbSave(kind);
+    }
+    if(cur&&!document.querySelector('.tb :focus')) renderBizNotes(cur);
     notesSave(); DATA_notes_refresh();
     document.querySelectorAll('.card').forEach(el=>refreshMark(el.dataset.c)); if(cur) refreshMark(cur.c);
-    setSync(noteOld||bizOld?'メモを同期するには、Apps Scriptのコードを新しくしてください':(Object.keys(pending).length?'評価の送信待ち '+Object.keys(pending).length+'件':'評価とメモはスプレッドシートと同期'));
+    setSync(anyOld()?'メモを同期するには、Apps Scriptのコードを新しくしてください':(Object.keys(pending).length?'評価の送信待ち '+Object.keys(pending).length+'件':'評価とメモはスプレッドシートと同期'));
     flush();
   }catch(e){ setSync(e.code==='nocfg'?'評価はこの端末に保存（設定でつなぐと同期）':'評価はこの端末に保存（同期できませんでした）') }
 }
@@ -646,7 +666,7 @@ document.getElementById('copyO').addEventListener('click',async()=>{
     lines.push(`【${MK[k].label}】`);
     for(const g of ['a','b','c','d']){
       const cs=ks.filter(x=>marks[x]===g).map(x=>x.slice(k.length+1)).sort(); if(!cs.length) continue;
-      lines.push(`${g.toUpperCase()}（${cs.length}社）`); cs.forEach(c=>{ lines.push(`  ${c} ${byC[c]||''}`.trimEnd()); const n=notes[k+'_'+c]; if(n) lines.push('    メモ：'+n.replace(/\n/g,' ')); bizDecode(biz[k+'_'+c]).forEach(r=>lines.push(`    ・${r.n}${r.v?' '+r.v:''}${r.m?'：'+r.m.replace(/\n/g,' '):''}`)) });
+      lines.push(`${g.toUpperCase()}（${cs.length}社）`); cs.forEach(c=>{ lines.push(`  ${c} ${byC[c]||''}`.trimEnd()); const n=notes[k+'_'+c]; if(n) lines.push('    メモ：'+n.replace(/\n/g,' ')); bizDecode(biz[k+'_'+c]).forEach(r=>lines.push(`    ・${r.n}${r.v?' '+r.v:''}${r.m?'：'+r.m.replace(/\n/g,' '):''}`)); const g=bizDecode(TB.geo.data[k+'_'+c]); if(g.length) lines.push('    販売国：'+g.map(r=>r.n+(r.v?' '+r.v+'%':'')+(r.m?'（'+r.m.replace(/\n/g,' ')+'）':'')).join('、')) });
     }
   }
   if(!lines.length){toast('まだ評価した銘柄がありません');return}
