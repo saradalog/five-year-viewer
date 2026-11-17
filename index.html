@@ -181,6 +181,7 @@ body{overflow-x:hidden}
       <label class="note" for="c-url">ウェブアプリのURL（…/exec）<input id="c-url" class="inp" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
       <label class="note" for="c-token">合言葉<input id="c-token" class="inp" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <button class="back" id="cfgSave" type="button" style="justify-self:start">保存してつなぐ</button><p class="note" id="cfgMsg" style="margin:0"></p>
+      <a class="linkbtn" id="cfgTest" href="#" target="_blank" rel="noopener" style="justify-self:start;font-size:14px">つながらないとき：ブラウザでApps Scriptの応答を見る</a>
     </div>
     <div class="panel" style="display:grid;gap:8px">
       <h3>この端末のデータ</h3>
@@ -467,6 +468,11 @@ function openCfg(lead){
 function closeCfg(){document.getElementById('cfg').classList.remove('open')}
 document.getElementById('openCfg').addEventListener('click',()=>openCfg());
 document.getElementById('cfgBack').addEventListener('click',closeCfg);
+document.getElementById('cfgTest').addEventListener('click',e=>{
+  const url=document.getElementById('c-url').value.trim(), token=document.getElementById('c-token').value.trim();
+  if(!url){e.preventDefault(); document.getElementById('cfgMsg').textContent='先にURLを入れてください。'; return}
+  e.currentTarget.href=url+(url.includes('?')?'&':'?')+'action=ping&token='+encodeURIComponent(token);
+});
 document.getElementById('cfgSave').addEventListener('click',async()=>{
   const url=document.getElementById('c-url').value.trim(), token=document.getElementById('c-token').value.trim();
   const msg=document.getElementById('cfgMsg');
