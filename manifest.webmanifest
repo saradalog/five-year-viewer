@@ -1,0 +1,16 @@
+{
+  "name": "全銘柄5年ビューア",
+  "short_name": "5年ビューア",
+  "description": "日本・米国・香港の全銘柄の直近5期の財務と株価をA〜Dで評価する",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f5",
+  "theme_color": "#0f6b5c",
+  "lang": "ja",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

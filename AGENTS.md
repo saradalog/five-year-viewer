@@ -1,0 +1,46 @@
+# AGENTS.md — saradalog/five-year-viewer（全銘柄5年ビューア）
+
+> 複数リポジトリをまたぐ現在の全体仕様は、非公開 `saradalog/analysis/PROJECT_HANDOFF.md` が正本です。アクセスできる場合は最初に読んでください。
+
+このファイルは、このリポジトリを編集するAI（Codex・Gemini・Copilot・Claude など）向けの説明です。
+持ち主は日本語で指示します。画面の文言・説明・コミットメッセージは日本語で書いてください。
+
+## これは何か
+
+日本（東証プライム・スタンダード・グロース約3,700社）・米国（NYSE・Nasdaq・NYSE American 約4,400社）・香港（約900社）の直近5期の財務と株価を見て、監視銘柄の候補をA〜Dで評価するWebアプリ（PWA）。GitHub Pages（`main` のルート）で https://saradalog.github.io/five-year-viewer/ に配信。
+
+| 場所 | 中身 |
+|---|---|
+| このリポジトリ（公開） | 画面だけ：`index.html`（1枚、ビルド不要）、`manifest.webmanifest`、`icons/`。データは置かない |
+| 持ち主のPC `C:\Users\tomoy\jquants_data\_scripts\five_year\` | データを作るPython（`update_app.sh` がまとめ役）と `apps_script/Code.gs` |
+| Googleドライブのフォルダ「全銘柄5年ビューア_データ」 | `fyv_jp.json.gz`・`fyv_us.json.gz`・`fyv_hk.json.gz`・`fyv_meta.json`（同じ名前が複数あれば一番新しいものを使う） |
+| スプレッドシート「全銘柄_直近5年_財務と株価_日米中」 | 「評価」タブ（キー・国・コード・銘柄名・評価・更新日時） |
+| Apps Script（`Code.gs`） | ドライブのデータを返し、評価を保存する。合言葉は `'ここに合言葉'` に伏せてPCに置いてある。直したら持ち主が Apps Script エディタに貼り、合言葉を入れ直して「新バージョン」でデプロイし直す。このリポジトリには置かない |
+
+## Apps Script との約束（`api()` 関数）
+
+設定画面の URL（`…/exec`）と合言葉を localStorage（`fyv-cfg`）に保存し、`action` を付けて呼ぶ。
+
+| action | 用途 |
+|---|---|
+| `ping` / `meta` | 接続確認と `fyv_meta.json`（株価の日付・更新時刻） |
+| `data`（`m=jp/us/hk`） | その国のデータ。gzipしたJSONをbase64で返す。端末の IndexedDB（`five-year-viewer` の `kv`、キー `data-jp` など）に `meta.built` 付きで保存し、`built` が変わったときだけ受け取り直す |
+| `marks` | 評価の一覧 `{ "jp_7203": "a", ... }` |
+| `mark`（POST、本文JSON） | 評価の保存・削除（`key`・`mark`＝A〜Dまたは空・`code`・`name`）。送れなかった分は localStorage（`fyv-pending`）に残して次に送る |
+
+## データの形（1社＝1配列）
+
+`[コード, 銘柄名, 市場, 業種, 最新期, 会計基準または決算の通貨, 株価, 時価総額, 理論株価, 適正株価, [決算期×5], 売上高[5], 営業利益[5], 営業利益率[5], 経常利益[5], 経常利益率[5], 当期純利益[5], EPS[5], 有利子負債[5], 人件費[5], 時価総額_期末[5], 株価_期末[5]]`
+各5要素は古い順（4期前→最新期）。米国・香港の「経常利益」は税引前利益。金額の単位は億（日本は円、米国・香港は決算の通貨）。
+
+## 理論株価・適正株価（変えるときは持ち主に確認）
+
+- 理論株価：2段階モデル（EPSが5年間 g1 で伸び、その後2.5%。割引率は規模で8〜10%）。
+- 適正株価：日本は東証33業種ごとのPBR×ROE回帰、米国・香港は市場全体のPBR×ROE回帰。
+- 計算はPCのPython側（`s3_build.py`・`u2_build.py`・`h1_build.py`）。画面では計算しない。
+
+## 画面を直すときの約束
+
+- 1枚の `index.html` のまま、外部ライブラリなしで保つ。
+- スマホ幅（390px前後）で横にはみ出さないこと。
+- 同じ画面は Claude のアーティファクト版（評価はアーティファクトのdbに保存）にもあるが、評価の保存先が別。持ち主が使うのはこのGitHub版。
