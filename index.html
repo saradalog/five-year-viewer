@@ -92,6 +92,16 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:760px;margin:0 auto}
 /* 詳細 */
 #detail{position:fixed;inset:0;z-index:20;background:var(--paper);overflow-y:auto;display:none}
 #detail.open{display:block}
+.biz h4{margin:12px 0 6px;font-size:13px;color:var(--muted);font-weight:500}
+.desc{margin:0;font-size:14px;line-height:1.7}
+.segs{display:grid;gap:6px}
+.seg-row{display:grid;grid-template-columns:minmax(0,9em) 1fr auto;gap:8px;align-items:center;font-size:13px}
+.seg-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg-bar{height:8px;background:var(--mid-soft);border-radius:4px;overflow:hidden}
+.seg-bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.seg-v small{color:var(--muted);font-size:11px}
+.ovv{margin:0}.ovv .num{font-size:18px;font-weight:500}
+.rs{margin:6px 0}.rs b{font-size:13px}.rs p{margin:2px 0 0;font-size:14px;line-height:1.7;white-space:pre-wrap}
 #cfg{position:fixed;inset:0;z-index:30;background:var(--paper);overflow-y:auto;display:none}
 #cfg.open{display:block}
 .inp{display:block;width:100%;margin-top:4px;border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:9px 12px;color:var(--ink);font:inherit}
@@ -140,7 +150,7 @@ body{overflow-x:hidden}
     <button type="button" data-mkt="hk" aria-pressed="false">香港<small id="n-hk">900社</small></button>
   </div>
   <div class="row">
-    <input id="q" type="search" placeholder="コード・銘柄名・業種で探す" autocomplete="off">
+    <input id="q" type="search" placeholder="コード・銘柄名・業種・事業内容で探す" autocomplete="off">
     <select id="sort" aria-label="並び替え">
       <option value="code">コード順</option>
       <option value="mc">時価総額が大きい順</option>
@@ -148,6 +158,7 @@ body{overflow-x:hidden}
       <option value="rfa">株価÷適正が低い順</option>
       <option value="g">売上の伸びが高い順</option>
       <option value="opm">営業利益率が高い順</option>
+      <option value="ov">海外比率が高い順</option>
     </select>
   </div>
   <div class="chips" role="group" aria-label="絞り込み">
@@ -157,6 +168,8 @@ body{overflow-x:hidden}
     <button class="chip" type="button" data-f="g10" aria-pressed="false">売上の伸び10%+</button>
     <button class="chip" type="button" data-f="opm10" aria-pressed="false">営業利益率10%+</button>
     <button class="chip" type="button" data-f="profit" aria-pressed="false">黒字</button>
+    <button class="chip" type="button" data-f="ov30" aria-pressed="false">海外比率30%+</button>
+    <button class="chip" type="button" data-f="rs" aria-pressed="false">調査済み</button>
     <button class="chip" type="button" data-m="a" aria-pressed="false">Aだけ</button>
     <button class="chip" type="button" data-m="b" aria-pressed="false">Bだけ</button>
     <button class="chip" type="button" data-m="c" aria-pressed="false">Cだけ</button>
@@ -209,11 +222,12 @@ function lastVal(a){for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; r
 function cagr(a){let i0=-1,i1=-1;for(let i=0;i<a.length;i++) if(a[i]!=null&&a[i]>0){if(i0<0)i0=i;i1=i}
   if(i0<0||i1<=i0) return null; return (Math.pow(a[i1]/a[i0],1/(i1-i0))-1)*100}
 function prep(r){
-  const o={c:r[0],n:String(r[1]||'').normalize('NFKC'),m:r[2],s:r[3],l:r[4],ccy:r[5],p:r[6],mc:r[7],fv:r[8],fa:r[9],per:r[10],f:r.slice(11)};
+  const o={c:r[0],n:String(r[1]||'').normalize('NFKC'),m:r[2],s:r[3],l:r[4],ccy:r[5],p:r[6],mc:r[7],fv:r[8],fa:r[9],per:r[10],f:r.slice(11,22),ex:r[22]||null};
+  o.ov=o.ex&&o.ex.ov!=null?o.ex.ov:null;
   o.rfv=(o.p&&o.fv)?o.p/o.fv:null; o.rfa=(o.p&&o.fa)?o.p/o.fa:null;
   const S=o.f[0]; o.g=cagr(S); o.opm=lastVal(o.f[2]); o.np=lastVal(o.f[5]);
   const v=S.filter(x=>x!=null); o.up=v.length>=3&&v.every((x,i)=>i===0||x>v[i-1]);
-  o.key=(o.c+' '+o.n+' '+o.s+' '+o.m).toLowerCase();
+  o.key=(o.c+' '+o.n+' '+o.s+' '+o.m+' '+(o.ex?(o.ex.d||'')+' '+(o.ex.ind||'')+' '+(o.ex.seg||[]).map(x=>x[0]).join(' '):'')).toLowerCase();
   return o;
 }
 // ---- Apps Script とのやりとり
@@ -292,12 +306,14 @@ function apply(){
     if(f.has('g10')&&!(o.g!=null&&o.g>=10)) return false;
     if(f.has('opm10')&&!(o.opm!=null&&o.opm>=10)) return false;
     if(f.has('profit')&&!(o.np!=null&&o.np>0)) return false;
+    if(f.has('ov30')&&!(o.ov!=null&&o.ov>=30)) return false;
+    if(f.has('rs')&&!(o.ex&&o.ex.rs)) return false;
     const mk=marks[mkt+'_'+o.c];
     if(st.m==='none'&&mk) return false;
     if(st.m&&st.m!=='none'&&mk!==st.m) return false;
     return true;
   });
-  const by={mc:o=>-(o.mc??-1e18),rfv:o=>o.rfv??1e9,rfa:o=>o.rfa??1e9,g:o=>-(o.g??-1e9),opm:o=>-(o.opm??-1e9)}[st.sort];
+  const by={mc:o=>-(o.mc??-1e18),rfv:o=>o.rfv??1e9,rfa:o=>o.rfa??1e9,g:o=>-(o.g??-1e9),opm:o=>-(o.opm??-1e9),ov:o=>-(o.ov??-1e9)}[st.sort];
   if(by) v=v.slice().sort((a,b)=>by(a)-by(b));
   view=v; shown=0; document.getElementById('list').innerHTML='';
   document.getElementById('count').textContent=`${fmt(v.length)}社 / ${fmt(all.length)}社`;
@@ -315,7 +331,7 @@ function spark(S){
 function cardHTML(o){
   const k=mkt+'_'+o.c, mk=marks[k]||'';
   const g=o.g==null?'':`<span>売上 年${o.g>=0?'+':''}${fmt(o.g,1)}%</span>`;
-  const opm=o.opm==null?'':`<span>営業利益率 ${fmt(o.opm,1)}%</span>`;
+  const opm=(o.opm==null?'':`<span>営業利益率 ${fmt(o.opm,1)}%</span>`)+(o.ov==null?'':`<span>海外 ${fmt(o.ov,0)}%</span>`)+(o.ex&&o.ex.rs?'<span>📝調査</span>':'');
   const p1=o.rfv==null?'<span class="pill">理論 —</span>':`<span class="pill ${ratioClass(o.rfv)}">株価÷理論 <b>${fmt(o.rfv,2)}</b></span>`;
   const p2=o.rfa==null?'<span class="pill">適正 —</span>':`<span class="pill ${ratioClass(o.rfa)}">株価÷適正 <b>${fmt(o.rfa,2)}</b></span>`;
   return `<article class="card ${mk?'m-'+mk:''}" data-c="${o.c}">
@@ -377,6 +393,26 @@ function chartLine(o){
   s+=`<text x="${x(5)}" y="${H-6}" text-anchor="end" font-size="10" fill="var(--muted)">現在</text>`;
   return s+'</svg>';
 }
+function bizPanel(o,money){
+  const e=o.ex; if(!e) return '<div class="panel"><h3>事業の中身</h3><p class="note">まだデータがありません（有価証券報告書・会社紹介を取得後に入ります）。</p></div>';
+  let h='<div class="panel biz"><h3>事業の中身</h3>';
+  if(e.ind||e.cty) h+=`<p class="note">${esc([e.ind,e.cty].filter(Boolean).join(' · '))}</p>`;
+  if(e.d) h+=`<p class="desc">${esc(e.d)}</p>`;
+  const segs=(e.seg||[]).filter(x=>x[2]!=null);
+  if(segs.length){
+    h+='<h4>事業別売上（外部顧客への売上）</h4><div class="segs">'+segs.map(x=>`<div class="seg-row"><span class="seg-name">${esc(x[0])}</span><span class="seg-bar"><i style="width:${Math.max(2,Math.min(100,x[2]))}%"></i></span><span class="num seg-v">${fmt(x[2],0)}%${x[1]!=null?`<small> ${fmtMoney(x[1])}</small>`:''}</span></div>`).join('')+'</div>';
+  }
+  if(e.ov!=null||e.ovn) h+=`<h4>海外比率</h4><p class="ovv"><span class="num">${e.ov!=null?fmt(e.ov,1)+'%':'—'}</span> <span class="note">${esc(e.ovn==='推定'?'（表から推定）':e.ovn==='海外10%未満'?'海外は売上の10%未満（有報で記載省略）':e.ovn==='海外売上なし'?'海外売上なし':e.ovn==='セグメントから計算'?'（地域セグメントから計算）':e.ovn||'')}</span></p>`;
+  const r=e.rs;
+  if(r){
+    h+='<h4>Claudeの調査</h4>';
+    [['主な商品・サービス',r.prod],['売上ドライバー',r.drv],['マーケットシェア',r.ms],['メモ',r.note]].forEach(([k,v])=>{ if(v) h+=`<div class="rs"><b>${k}</b><p>${esc(v)}</p></div>` });
+    if(r.src&&r.src.length) h+='<p class="note">出典：'+r.src.map(u=>`<a href="${esc(u.url||u)}" target="_blank" rel="noopener">${esc(u.t||u.url||u)}</a>`).join('、')+'</p>';
+    if(r.date) h+=`<p class="note">調査日 ${esc(r.date)}</p>`;
+  } else h+='<p class="note">売上ドライバー・マーケットシェアは、Aを付けた会社をClaudeに「調べて」と頼むとここに入ります。</p>';
+  if(e.src) h+=`<p class="note">事業内容の出典：${esc(e.src)}</p>`;
+  return h+'</div>';
+}
 function openDetail(c,push=true){
   const o=(DATA[mkt]||[]).find(x=>x.c===c); if(!o) return; cur=o;
   const M=MK[mkt], money=M.money(o.ccy), mk=marks[mkt+'_'+o.c]||'';
@@ -397,6 +433,7 @@ function openDetail(c,push=true){
       <div class="tile"><div class="k">理論株価（2段階モデル）</div><div class="v">${fmtPx(o.fv)}</div><div class="s"><span class="pill ${ratioClass(r1)}">株価÷理論 <b>${r1==null?'—':fmt(r1,2)}</b></span></div></div>
       <div class="tile"><div class="k">適正株価（PBR×ROE）</div><div class="v">${fmtPx(o.fa)}</div><div class="s"><span class="pill ${ratioClass(r2)}">株価÷適正 <b>${r2==null?'—':fmt(r2,2)}</b></span></div></div>
     </div>
+    ${bizPanel(o,money)}
     <div class="panel"><h3>売上高と営業利益（${money}）</h3><div class="legend"><span><i style="background:var(--accent)"></i>売上高</span><span><i style="background:var(--mark-t)"></i>営業利益</span></div>${chartBars(o)}</div>
     <div class="panel"><h3>株価（各期末と現在、${M.px}）</h3>${chartLine(o)}</div>
     <div class="panel"><h3>5期の数字</h3><div class="tablewrap"><table><thead><tr><th>項目</th>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
