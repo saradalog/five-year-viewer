@@ -96,7 +96,7 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:760px;margin:0 auto}
 #cfg.open{display:block}
 .inp{display:block;width:100%;margin-top:4px;border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:9px 12px;color:var(--ink);font:inherit}
 .dhead{position:sticky;top:0;background:var(--paper);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;align-items:center;gap:10px;z-index:2}
-.back{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 12px;font-size:14px}
+.back{white-space:nowrap;flex:none;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 12px;font-size:14px}
 .dwrap{max-width:760px;margin:0 auto;padding:14px 16px 48px;display:grid;gap:14px}
 .dtitle h2{margin:0;font-size:20px;text-wrap:balance}
 .dtitle .cinfo{margin-top:2px}
@@ -180,7 +180,7 @@ body{overflow-x:hidden}
       <p class="note" id="cfgLead">データと評価は、Googleスプレッドシートに付けたApps Scriptから合言葉で受け取ります。ウェブアプリのURLと合言葉を入れてください。</p>
       <label class="note" for="c-url">ウェブアプリのURL（…/exec）<input id="c-url" class="inp" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
       <label class="note" for="c-token">合言葉<input id="c-token" class="inp" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      <div class="row"><button class="back" id="cfgSave" type="button">保存してつなぐ</button><span class="note" id="cfgMsg"></span></div>
+      <button class="back" id="cfgSave" type="button" style="justify-self:start">保存してつなぐ</button><p class="note" id="cfgMsg" style="margin:0"></p>
     </div>
     <div class="panel" style="display:grid;gap:8px">
       <h3>この端末のデータ</h3>
