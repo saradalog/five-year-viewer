@@ -457,6 +457,7 @@ function edaPanel(o){
   return `<div class="panel eda-panel"><h3>えだまめの分析（参考）</h3>
     <div class="eda-top"><span class="eda-g">${esc(r.g||'—')}</span>${r.c?`<span><b>${esc(r.c)}</b></span>`:''}</div>
     <div class="cinfo"><span>適正株価 ${px(r.fv)}</span><span>買い目安 ${px(r.buy)}</span><span>分析時の株価 ${px(r.px)}</span></div>
+    ${(r.o||r.p||r.q)?`<div class="cinfo">${r.o?`<span>点数（定量） <b>${esc(r.o)}</b>/100</span>`:''}${r.p?`<span>定量判定 <b>${esc(r.p)}</b></span>`:''}${r.q?`<span>数字の照合 ${esc(r.q)}</span>`:''}</div>`:''}
     ${r.m?`<p class="eda-t">${esc(r.m)}</p>`:''}
     ${r.n?`<p class="eda-t">${esc(r.n)}</p>`:''}
     ${r.t?`<p class="eda-t">${esc(r.t)}</p>`:''}
