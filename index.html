@@ -457,6 +457,7 @@ function edaPanel(o){
   return `<div class="panel eda-panel"><h3>えだまめの分析（参考）</h3>
     <div class="eda-top"><span class="eda-g">${esc(r.g||'—')}</span>${r.c?`<span><b>${esc(r.c)}</b></span>`:''}</div>
     <div class="cinfo"><span>適正株価 ${px(r.fv)}</span><span>買い目安 ${px(r.buy)}</span><span>分析時の株価 ${px(r.px)}</span></div>
+    ${r.m?`<p class="eda-t">${esc(r.m)}</p>`:''}
     ${r.t?`<p class="eda-t">${esc(r.t)}</p>`:''}
     <p class="note">${r.d?'分析日 '+esc(r.d)+'。':''}評価（A〜D）は自分で押してください。${r.s?'<br>出典：'+esc(r.s):''}</p></div>`;
 }
@@ -517,7 +518,7 @@ let pending={}; try{pending=JSON.parse(localStorage.getItem('fyv-pending')||'{}'
 let notes={}; try{notes=JSON.parse(localStorage.getItem('fyv-notes')||'{}')}catch(e){}
 let pendNotes={}; try{pendNotes=JSON.parse(localStorage.getItem('fyv-pending-notes')||'{}')}catch(e){}
 let noteOld=false;
-let eda={}; try{eda=JSON.parse(localStorage.getItem('fyv-eda')||'{}')}catch(e){}  // えだまめの分析（参考）。key -> {g,c,fv,buy,px,t,d,s}
+let eda={}; try{eda=JSON.parse(localStorage.getItem('fyv-eda')||'{}')}catch(e){}  // えだまめの分析（参考）。key -> {g,c,fv,buy,px,t,d,s,m}
 function edaSave(){try{localStorage.setItem('fyv-eda',JSON.stringify(eda))}catch(e){}}
 // 表のメモ（事業ごと・販売国ごと）。1行＝名前・数字・メモ。スプレッドシートには1行ずつ「名前 | 数字 | メモ」で保存
 const TB={
