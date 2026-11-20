@@ -475,8 +475,8 @@ function bizPanel(o,money){
   if(e.src) h+=`<p class="note">事業内容の出典：${esc(e.src)}</p>`;
   return h+'</div>';
 }
-// 最新版（会社予想・えだまめ予想などの項目まで入った分析）だけを「済み」とする
-function edaDone(k){ const r=eda[k]; return !!(r&&r.g&&/^照合/.test(r.q||'')&&/【えだまめ予想】/.test(r.t||'')) }
+// 最新版（会社予想・えだまめ予想などの項目まで入った分析）で、事業の中身の表（事業メモ・販売国メモ）まで記入が済んだものだけを「済み」とする
+function edaDone(k){ const r=eda[k]; return !!(r&&r.g&&/^照合/.test(r.q||'')&&/【えだまめ予想】/.test(r.t||'')&&(TB.biz.data[k]||TB.geo.data[k])) }
 // チェック（見た）はこの端末に保存。分析し直されたら（分析日か要点が変わったら）また一覧に出す
 let edaChk={}; try{edaChk=JSON.parse(localStorage.getItem('fyv-eda-seen')||'{}')}catch(e){}
 const edaSig=k=>{ const r=eda[k]||{}; return (r.d||'')+'|'+String(r.t||'').length };
@@ -720,6 +720,7 @@ async function syncMarks(){
       else T.old=true;
       tbSave(kind);
     }
+    if(st.f.has('eda')||st.f.has('edaSeen')) apply(); else edaCount();
     if(j.edaSeen){ const r={...j.edaSeen}; for(const [k,v] of Object.entries(pendSeen)){ if(v) r[k]=v; else delete r[k] } edaChk=r; seenOld=false; seenSave(); edaCount() }
     else seenOld=true;
     if(j.eda&&JSON.stringify(j.eda)!==JSON.stringify(eda)){ eda=j.eda; edaSave(); edaRefresh(); if(st.f.has('eda')||st.f.has('edaSeen')||st.sort==='eda'||st.sort==='edag') apply(); else edaCount() }
