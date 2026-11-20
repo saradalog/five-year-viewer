@@ -481,7 +481,11 @@ function edaDone(k){ const r=eda[k]; return !!(r&&r.g&&/^照合/.test(r.q||'')&&
 let edaChk={}; try{edaChk=JSON.parse(localStorage.getItem('fyv-eda-seen')||'{}')}catch(e){}
 const edaSig=k=>{ const r=eda[k]||{}; return (r.d||'')+'|'+String(r.t||'').length };
 function edaSeen(k){ return !!edaChk[k] && edaChk[k]===edaSig(k) }
-function edaSetSeen(k,on){ if(on) edaChk[k]=edaSig(k); else delete edaChk[k]; try{localStorage.setItem('fyv-eda-seen',JSON.stringify(edaChk))}catch(e){} }
+// Apps Script が対応していれば「えだまめ_チェック」タブにも保存して、どの端末でも同じにする（送れなかった分は端末に残して次に送る）
+let pendSeen={}; try{pendSeen=JSON.parse(localStorage.getItem('fyv-pending-edaseen')||'{}')}catch(e){}
+let seenOld=false;
+function seenSave(){ try{localStorage.setItem('fyv-eda-seen',JSON.stringify(edaChk));localStorage.setItem('fyv-pending-edaseen',JSON.stringify(pendSeen))}catch(e){} }
+function edaSetSeen(k,on){ if(on) edaChk[k]=edaSig(k); else delete edaChk[k]; pendSeen[k]=on?edaChk[k]:''; seenSave(); if(!seenOld) flush() }
 function edaOrder(){ // 分析日が新しい順。同じ日はシートの下の行（あとで書いた行）ほど新しい
   const ks=Object.keys(eda); const o={};
   ks.map((k,i)=>[k,String(eda[k].d||'').replace(/\D/g,''),i]).sort((x,y)=>x[1]===y[1]?x[2]-y[2]:(x[1]<y[1]?-1:1)).forEach((x,i)=>o[x[0]]=i);
@@ -620,6 +624,11 @@ async function flush(){
       try{ await api('note',null,{key:k,note:p.note,code:p.code,name:p.name}); if(pendNotes[k]===p) delete pendNotes[k]; notesSave(); noteStatus(k) }
       catch(e){ if(e.code==='api'&&/bad_action/.test(e.message)){ noteOld=true; noteStatus(k) } break }
     }
+    if(!seenOld) for(const k of Object.keys(pendSeen)){
+      const v=pendSeen[k];
+      try{ await api('edaseen',null,{key:k,sig:v}); if(pendSeen[k]===v) delete pendSeen[k]; seenSave() }
+      catch(e){ if(e.code==='api'&&/bad_action/.test(e.message)) seenOld=true; break }
+    }
     for(const kind of Object.keys(TB)){ const T=TB[kind];
       for(const k of Object.keys(T.pend)){
         const p=T.pend[k];
@@ -711,6 +720,8 @@ async function syncMarks(){
       else T.old=true;
       tbSave(kind);
     }
+    if(j.edaSeen){ const r={...j.edaSeen}; for(const [k,v] of Object.entries(pendSeen)){ if(v) r[k]=v; else delete r[k] } edaChk=r; seenOld=false; seenSave(); edaCount() }
+    else seenOld=true;
     if(j.eda&&JSON.stringify(j.eda)!==JSON.stringify(eda)){ eda=j.eda; edaSave(); edaRefresh(); if(st.f.has('eda')||st.f.has('edaSeen')||st.sort==='eda'||st.sort==='edag') apply(); else edaCount() }
     if(cur&&!document.querySelector('.tb :focus')) renderBizNotes(cur);
     notesSave(); DATA_notes_refresh();
