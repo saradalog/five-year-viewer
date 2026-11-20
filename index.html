@@ -108,6 +108,16 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:var(--wide,760px);mar
 .eda-panel .eda-top{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;margin:2px 0 6px}
 .eda-panel .eda-g{font-size:22px;font-weight:700;color:var(--accent)}
 .eda-panel .eda-t{margin:6px 0 0;font-size:14px;line-height:1.7;white-space:pre-wrap}
+.eda-panel details{border-top:1px solid var(--line);padding:8px 0 2px;margin-top:8px}
+.eda-panel summary{font-weight:700;font-size:15px;cursor:pointer;padding:2px 0}
+.eda-sec{margin:8px 0 0}.eda-sec b{display:block;font-size:13px;color:var(--accent)}
+.eda-sec p{margin:2px 0 0;font-size:15px;line-height:1.75;white-space:pre-wrap}
+.eda-g.ga{color:var(--good)}.eda-g.gc{color:var(--muted)}.eda-g.gd{color:var(--bad)}
+.eda-line{grid-column:1/3;font-size:13px;line-height:1.5;background:var(--accent-soft);border-radius:6px;padding:5px 8px}
+.eda-line b{font-weight:700;margin-right:4px}
+.dnav{display:flex;gap:8px;justify-content:space-between;align-items:center}
+.dnav .sub{font-size:12px}
+.chip .n{font-size:11px;opacity:.75;margin-left:3px}
 .bn-row{display:grid;gap:4px;padding:8px 0;border-bottom:1px dashed var(--line)}
 .bn-top{display:grid;grid-template-columns:minmax(0,1fr) auto 6.5em 2.2em;gap:6px;align-items:center}
 .bn-row input,.bn-row textarea{width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:7px 9px;font:inherit;font-size:14px}
@@ -186,9 +196,12 @@ body{overflow-x:hidden}
       <option value="g">売上の伸びが高い順</option>
       <option value="opm">営業利益率が高い順</option>
       <option value="ov">海外比率が高い順</option>
+      <option value="eda">えだまめの分析が新しい順</option>
+      <option value="edag">えだまめの判定順（A→D）</option>
     </select>
   </div>
   <div class="chips" role="group" aria-label="絞り込み">
+    <button class="chip" type="button" data-f="eda" aria-pressed="false">えだまめ済み<span class="n" id="n-eda"></span></button>
     <button class="chip" type="button" data-f="cheapFv" aria-pressed="false">理論より安い</button>
     <button class="chip" type="button" data-f="cheapFa" aria-pressed="false">適正より安い</button>
     <button class="chip" type="button" data-f="growth" aria-pressed="false">毎年増収</button>
@@ -210,7 +223,7 @@ body{overflow-x:hidden}
 <div id="more"></div>
 
 <section id="detail" aria-label="銘柄の詳細">
-  <div class="dhead"><button class="back" id="back" type="button">← 一覧へ</button><span class="sub" id="dsub"></span></div>
+  <div class="dhead"><button class="back" id="back" type="button">← 一覧へ</button><span class="sub" id="dsub" style="flex:1"></span><button class="back" id="dprev" type="button" aria-label="前の会社">‹ 前</button><button class="back" id="dnext" type="button" aria-label="次の会社">次 ›</button></div>
   <div class="dwrap" id="dbody"></div>
 </section>
 <section id="cfg" aria-label="設定">
@@ -343,6 +356,7 @@ function apply(){
     if(f.has('profit')&&!(o.np!=null&&o.np>0)) return false;
     if(f.has('ov30')&&!(o.ov!=null&&o.ov>=30)) return false;
     if(f.has('rs')&&!(o.ex&&o.ex.rs)) return false;
+    if(f.has('eda')&&!edaDone(mkt+'_'+o.c)) return false;
     if(f.has('memo')&&!notes[mkt+'_'+o.c]&&!biz[mkt+'_'+o.c]&&!TB.geo.data[mkt+'_'+o.c]&&!TB.comp.data[mkt+'_'+o.c]) return false;
     const mk=marks[mkt+'_'+o.c];
     if(st.m==='none'&&mk) return false;
@@ -350,7 +364,12 @@ function apply(){
     return true;
   });
   const by={mc:o=>-(o.mc??-1e18),rfv:o=>o.rfv??1e9,rfa:o=>o.rfa??1e9,g:o=>-(o.g??-1e9),opm:o=>-(o.opm??-1e9),ov:o=>-(o.ov??-1e9)}[st.sort];
-  if(by) v=v.slice().sort((a,b)=>by(a)-by(b));
+  if(st.sort==='eda'||st.sort==='edag'){ const ord=edaOrder(); const gi={A:0,B:1,C:2,D:3};
+    v=v.slice().sort((a,b)=>{ const ka=mkt+'_'+a.c, kb=mkt+'_'+b.c;
+      if(st.sort==='edag'){ const ga=eda[ka]?gi[eda[ka].g]??8:9, gb=eda[kb]?gi[eda[kb].g]??8:9; if(ga!==gb) return ga-gb }
+      return (ord[kb]??-1)-(ord[ka]??-1) }) }
+  else if(by) v=v.slice().sort((a,b)=>by(a)-by(b));
+  edaCount();
   view=v; shown=0; document.getElementById('list').innerHTML='';
   document.getElementById('count').textContent=`${fmt(v.length)}社 / ${fmt(all.length)}社`;
   if(!v.length) document.getElementById('list').innerHTML='<div class="empty">条件に合う銘柄がありません。絞り込みを外してみてください。</div>';
@@ -378,7 +397,7 @@ function cardHTML(o){
       <span class="pills">${p1}${p2}${p3}</span>
     </button>
     <div class="cright"><span class="price">${fmtPx(o.p)}<span class="sub"> ${MK[mkt].px}</span></span>${markBtns(o.c,mk)}</div>
-    <div class="spark">${spark(o.f[0])}<span>売上5期</span>${g}${opm}</div>${memoHTML(o.c)}
+    <div class="spark">${spark(o.f[0])}<span>売上5期</span>${g}${opm}</div>${edaLine(k)}${memoHTML(o.c)}
   </article>`;
 }
 function markBtns(c,mk){
@@ -451,16 +470,31 @@ function bizPanel(o,money){
   if(e.src) h+=`<p class="note">事業内容の出典：${esc(e.src)}</p>`;
   return h+'</div>';
 }
+function edaDone(k){ const r=eda[k]; return !!(r&&r.g&&/^照合/.test(r.q||'')) }
+function edaOrder(){ // 分析日が新しい順。同じ日はシートの下の行（あとで書いた行）ほど新しい
+  const ks=Object.keys(eda); const o={};
+  ks.map((k,i)=>[k,String(eda[k].d||'').replace(/\D/g,''),i]).sort((x,y)=>x[1]===y[1]?x[2]-y[2]:(x[1]<y[1]?-1:1)).forEach((x,i)=>o[x[0]]=i);
+  return o }
+function edaCount(){ const el=document.getElementById('n-eda'); if(!el) return; const n=Object.keys(eda).filter(k=>k.startsWith(mkt+'_')&&edaDone(k)).length; el.textContent=n?n+'社':'' }
+const edaNum=v=>{ const n=Number(String(v??'').replace(/[,円]/g,'')); return v==null||v===''||isNaN(n)?null:n };
+function edaLine(k){ const r=eda[k]; if(!r||!r.g) return '';
+  const px=edaNum(r.px), buy=edaNum(r.buy); const gap=px&&buy?Math.round((px/buy-1)*100):null;
+  return `<div class="eda-line"><b>えだまめ ${esc(r.g)}</b>${esc(r.c||'')}${gap!=null?`<span class="sub">（分析時の株価は買い目安の${gap>=0?'+':''}${gap}%）</span>`:''}</div>` }
+function edaSecs(text){ // 【見出し】ごとに分けて読みやすく
+  const t=String(text||'').trim(); if(!t) return '';
+  const parts=t.split(/(?=【[^】]{1,20}】)/).map(x=>x.trim()).filter(Boolean);
+  return parts.map(x=>{ const m=x.match(/^【([^】]+)】\s*([\s\S]*)$/); return m?`<div class="eda-sec"><b>${esc(m[1])}</b><p>${esc(m[2])}</p></div>`:`<div class="eda-sec"><p>${esc(x)}</p></div>` }).join('') }
 function edaPanel(o){
   const r=eda[mkt+'_'+o.c]; if(!r) return '';
-  const px=v=>{ const n=Number(String(v??'').replace(/[,円]/g,'')); return v==null||v===''||isNaN(n)?'—':fmt(n,0)+'円' };
+  const px=v=>{ const n=edaNum(v); return n==null?'—':fmt(n,0)+'円' };
+  const gc={A:'ga',B:'',C:'gc',D:'gd'}[r.g]||'';
   return `<div class="panel eda-panel"><h3>えだまめの分析（参考）</h3>
-    <div class="eda-top"><span class="eda-g">${esc(r.g||'—')}</span>${r.c?`<span><b>${esc(r.c)}</b></span>`:''}</div>
+    <div class="eda-top"><span class="eda-g ${gc}">${esc(r.g||'—')}</span>${r.c?`<span><b>${esc(r.c)}</b></span>`:''}</div>
     <div class="cinfo"><span>適正株価 ${px(r.fv)}</span><span>買い目安 ${px(r.buy)}</span><span>分析時の株価 ${px(r.px)}</span></div>
     ${(r.o||r.p||r.q)?`<div class="cinfo">${r.o?`<span>点数（定量） <b>${esc(r.o)}</b>/100</span>`:''}${r.p?`<span>定量判定 <b>${esc(r.p)}</b></span>`:''}${r.q?`<span>数字の照合 ${esc(r.q)}</span>`:''}</div>`:''}
-    ${r.m?`<p class="eda-t">${esc(r.m)}</p>`:''}
-    ${r.n?`<p class="eda-t">${esc(r.n)}</p>`:''}
-    ${r.t?`<p class="eda-t">${esc(r.t)}</p>`:''}
+    ${r.t?`<details open><summary>要点</summary>${edaSecs(r.t)}</details>`:''}
+    ${r.m?`<details><summary>事業と市場</summary>${edaSecs(r.m)}</details>`:''}
+    ${r.n?`<details><summary>独自の視点</summary>${edaSecs(r.n)}</details>`:''}
     <p class="note">${r.d?'分析日 '+esc(r.d)+'。':''}評価（A〜D）は自分で押してください。${r.s?'<br>出典：'+esc(r.s):''}</p></div>`;
 }
 function edaRefresh(){
@@ -477,7 +511,9 @@ function openDetail(c,push=true){
   const rows=MET.map((m,i)=>{ const name=m.replace('経常利益',odp); const d=(i===6||i===10)?2:(i===2||i===4)?1:null;
     return `<tr><td>${name}<span class="sub">（${units[i]}）</span></td>${o.f[i].map(v=>`<td class="num ${v!=null&&v<0?'neg':''}">${v==null?'—':d!=null?fmt(v,d):fmtMoney(v)}</td>`).join('')}</tr>`}).join('');
   const r1=o.rfv, r2=o.rfa;
-  document.getElementById('dsub').textContent=`${M.label} · ${o.c}`;
+  const vi=view.findIndex(x=>x.c===o.c);
+  document.getElementById('dsub').textContent=`${M.label} · ${o.c}`+(vi>=0?`（${vi+1}/${view.length}）`:'');
+  document.getElementById('dprev').disabled=!(vi>0); document.getElementById('dnext').disabled=!(vi>=0&&vi<view.length-1);
   document.getElementById('dbody').innerHTML=`
     <div class="dtitle"><h2>${esc(o.n)}</h2>
       <div class="cinfo">${o.s?`<span>${esc(o.s)}</span>`:''}<span>${esc(o.m)}</span><span>最新期 ${o.l||'—'}</span><span>${mkt==='jp'?'会計基準 ':'決算の通貨 '}${esc(o.ccy)}</span></div></div>
@@ -507,6 +543,10 @@ function openDetail(c,push=true){
 }
 function closeDetail(){const ta=document.getElementById('memo'); if(ta&&cur) setNote(cur.c,ta.value); saveAllTb();document.getElementById('detail').classList.remove('open');document.body.style.overflow='';cur=null}
 window.addEventListener('hashchange',()=>{ if(location.hash!=='#detail') closeDetail() });
+function stepDetail(d){ if(!cur) return; const i=view.findIndex(x=>x.c===cur.c); const n=view[i+d]; if(!n) return;
+  const ta=document.getElementById('memo'); if(ta) setNote(cur.c,ta.value); saveAllTb(); openDetail(n.c,false) }
+document.getElementById('dprev').addEventListener('click',()=>stepDetail(-1));
+document.getElementById('dnext').addEventListener('click',()=>stepDetail(1));
 document.getElementById('back').addEventListener('click',()=>{ if(location.hash==='#detail') history.back(); else closeDetail(); setTimeout(()=>{if(cur) closeDetail()},250) });
 
 // ---- マーク
@@ -642,7 +682,7 @@ async function syncMarks(){
       else T.old=true;
       tbSave(kind);
     }
-    if(j.eda&&JSON.stringify(j.eda)!==JSON.stringify(eda)){ eda=j.eda; edaSave(); edaRefresh() }
+    if(j.eda&&JSON.stringify(j.eda)!==JSON.stringify(eda)){ eda=j.eda; edaSave(); edaRefresh(); if(st.f.has('eda')||st.sort==='eda'||st.sort==='edag') apply(); else edaCount() }
     if(cur&&!document.querySelector('.tb :focus')) renderBizNotes(cur);
     notesSave(); DATA_notes_refresh();
     document.querySelectorAll('.card').forEach(el=>refreshMark(el.dataset.c)); if(cur) refreshMark(cur.c);
@@ -717,7 +757,8 @@ document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',a
 let qt; document.getElementById('q').addEventListener('input',e=>{clearTimeout(qt); qt=setTimeout(()=>{st.q=e.target.value; apply()},150)});
 document.getElementById('sort').addEventListener('change',e=>{st.sort=e.target.value; apply()});
 document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{
-  if(b.dataset.f){const f=b.dataset.f; st.f.has(f)?st.f.delete(f):st.f.add(f); b.setAttribute('aria-pressed',String(st.f.has(f)))}
+  if(b.dataset.f){const f=b.dataset.f; st.f.has(f)?st.f.delete(f):st.f.add(f); b.setAttribute('aria-pressed',String(st.f.has(f)))
+    if(f==='eda'){ const sel=document.getElementById('sort'); if(st.f.has('eda')&&st.sort==='code'){st.sort='eda'; sel.value='eda'} else if(!st.f.has('eda')&&(st.sort==='eda'||st.sort==='edag')){st.sort='code'; sel.value='code'} } }
   else{const m=b.dataset.m; st.m=st.m===m?null:m; document.querySelectorAll('.chip[data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.m===st.m)))}
   apply();
 }));
@@ -749,7 +790,8 @@ async function start(){
 }
 start();
 window.addEventListener('online',()=>flush());
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') { if(Object.keys(pending).length) flush(); } });
+let lastSync=Date.now();
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') { if(Object.keys(pending).length) flush(); if(Date.now()-lastSync>5*60*1000){ lastSync=Date.now(); syncMarks() } } });
 </script>
 </body>
 </html>
