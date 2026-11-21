@@ -112,6 +112,17 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:var(--wide,760px);mar
 .eda-panel summary{font-weight:700;font-size:15px;cursor:pointer;padding:2px 0}
 .eda-sec{margin:8px 0 0}.eda-sec b{display:block;font-size:13px;color:var(--accent)}
 .eda-sec p{margin:2px 0 0;font-size:15px;line-height:1.75;white-space:pre-wrap}
+.eda-sec{padding:6px 0;border-bottom:1px solid var(--line)}.eda-sec:last-child{border-bottom:0}
+.eda-ln{margin:6px 0 0;font-size:15px;line-height:1.7}
+.eda-lb{display:inline-block;font-size:12px;font-weight:700;color:var(--muted);background:var(--mid-soft);border-radius:6px;padding:1px 8px;margin-right:6px}
+.eda-tx{margin-top:2px;white-space:pre-wrap}
+.eda-sub{display:block;margin:2px 0}
+.eda-bd{display:inline-block;font-size:13px;font-weight:700;border-radius:6px;padding:1px 10px;margin:4px 6px 2px 0;background:var(--mid-soft)}
+.eda-bd.good{background:var(--good-soft);color:var(--good)}.eda-bd.bad{background:var(--bad-soft);color:var(--bad)}
+.eda-ox,.eda-fc{margin:4px 0 0;padding:0;list-style:none}
+.eda-ox li,.eda-fc li{padding:4px 0;border-top:1px dashed var(--line)}
+.eda-fc li::before{content:'・';color:var(--muted)}
+.eda-mk{display:inline-block;width:1.6em;font-weight:700}.eda-mk.good{color:var(--good)}.eda-mk.bad{color:var(--bad)}
 .eda-g.ga{color:var(--good)}.eda-g.gc{color:var(--muted)}.eda-g.gd{color:var(--bad)}
 .eda-line{grid-column:1/3;font-size:13px;line-height:1.5;background:var(--accent-soft);border-radius:6px;padding:5px 8px}
 .eda-line b{font-weight:700;margin-right:4px}
@@ -497,10 +508,46 @@ function edaLine(k){ const r=eda[k]; if(!r||!r.g) return '';
   const px=edaNum(r.px), buy=edaNum(r.buy); const gap=px&&buy?Math.round((px/buy-1)*100):null;
   const btn=edaDone(k)?`<button class="eda-chk" type="button" data-edachk="${esc(k)}" aria-pressed="${edaSeen(k)}">${edaSeen(k)?'✓ チェック済み':'見たらチェック'}</button>`:'';
   return `<div class="eda-line"><b>えだまめ ${esc(r.g)}</b>${esc(r.c||'')}${gap!=null?`<span class="sub">（分析時の株価は買い目安の${gap>=0?'+':''}${gap}%）</span>`:''}${btn}</div>` }
-function edaSecs(text){ // 【見出し】ごとに分けて読みやすく
+// 【見出し】ごとに分け、さらに「ラベル：」ごとの行・○×の一覧・判定の札にして読みやすくする
+const EDA_VERDICT={'競争優位性':['あり','弱い','なし'],'参入障壁':['高い','中','低い'],'高付加価値化':['できている','途上','できていない']};
+const EDA_GOOD=new Set(['あり','高い','できている','言える','良い','満たす']), EDA_BAD=new Set(['なし','低い','できていない','言えない','悪い','満たさない']);
+function edaBadge(w){ return `<span class="eda-bd ${EDA_GOOD.has(w)?'good':EDA_BAD.has(w)?'bad':'mid'}">${esc(w)}</span>` }
+function edaFmtLine(lab, body){
+  body=body.trim();
+  // 先頭の判定語（言える／怪しい／言えない・良い／普通／悪い）を札に
+  let bd='';
+  const m=body.match(/^(言える|怪しい|言えない|良い|普通|悪い)[（(、。]?/);
+  if(m){ bd=edaBadge(m[1]); body=body.slice(m[1].length).replace(/^[、。]/,''); const pm=body.match(/^[（(]([\s\S]*)[）)]。?$/); if(pm) body=pm[1] }
+  let inner;
+  if(/[○×]、/.test(body)){   // 10年の質：まとめの1文＋○×の一覧
+    const k=body.indexOf('。'); const head=k>=0?body.slice(0,k+1):''; const rest=k>=0?body.slice(k+1):body;
+    const q=head.match(/「(満たす|一部|満たさない)」/); if(q) bd=edaBadge(q[1]);
+    const items=rest.replace(/。\s*$/,'').split(/(?<=[○×])、/).map(x=>x.trim()).filter(Boolean);
+    inner=(head?`<span class="eda-sub">${esc(head)}</span>`:'')+'<ul class="eda-ox">'+items.map(x=>{ const ok=/○$/.test(x); return `<li><span class="eda-mk ${ok?'good':'bad'}">${ok?'○':'×'}</span>${esc(x.replace(/[○×]$/,''))}</li>` }).join('')+'</ul>';
+  } else if(/／/.test(body)){  // えだまめ予想：今期／来期／再来期
+    const k=body.search(/。前提|。主な前提/); const fc=k>=0?body.slice(0,k+1):body; const rest=k>=0?body.slice(k+1):'';
+    inner='<ul class="eda-fc">'+fc.replace(/。$/,'').split('／').map(x=>`<li>${esc(x.trim())}</li>`).join('')+'</ul>'+(rest?`<span class="eda-sub">${esc(rest)}</span>`:'');
+  } else inner=esc(body);
+  return `<div class="eda-ln">${lab?`<span class="eda-lb">${esc(lab)}</span>`:''}${bd}<div class="eda-tx">${inner}</div></div>`;
+}
+function edaBody(head, body){
+  body=String(body||'').trim(); let top='';
+  const vs=EDA_VERDICT[head];
+  if(vs){ const w=vs.slice().sort((a,b)=>b.length-a.length).find(v=>body.startsWith(v)); if(w){ top=edaBadge(w); body=body.slice(w.length).replace(/^[。、]\s*/,'') } }
+  // 「ラベル：」で行に分ける（文の頭にある2〜10文字＋全角コロン）
+  const re=/(^|[。\n])\s*([^。、：（）「」\n]{2,10})：/g; const cuts=[]; let mm;
+  while((mm=re.exec(body))){ cuts.push({i:mm.index+mm[1].length, lab:mm[2].trim(), j:re.lastIndex}) }
+  let html='';
+  if(cuts.length){
+    if(cuts[0].i>0) html+=edaFmtLine('', body.slice(0,cuts[0].i));
+    cuts.forEach((c,n)=>{ html+=edaFmtLine(c.lab, body.slice(c.j, n+1<cuts.length?cuts[n+1].i:body.length)) });
+  } else html=edaFmtLine('', body);
+  return top+html;
+}
+function edaSecs(text){
   const t=String(text||'').trim(); if(!t) return '';
   const parts=t.split(/(?=【[^】]{1,20}】)/).map(x=>x.trim()).filter(Boolean);
-  return parts.map(x=>{ const m=x.match(/^【([^】]+)】\s*([\s\S]*)$/); return m?`<div class="eda-sec"><b>${esc(m[1])}</b><p>${esc(m[2])}</p></div>`:`<div class="eda-sec"><p>${esc(x)}</p></div>` }).join('') }
+  return parts.map(x=>{ const m=x.match(/^【([^】]+)】\s*([\s\S]*)$/); return m?`<div class="eda-sec"><b>${esc(m[1])}</b>${edaBody(m[1],m[2])}</div>`:`<div class="eda-sec">${edaBody('',x)}</div>` }).join('') }
 function edaPanel(o){
   const r=eda[mkt+'_'+o.c]; if(!r) return '';
   const px=v=>{ const n=edaNum(v); return n==null?'—':fmt(n,0)+'円' };
