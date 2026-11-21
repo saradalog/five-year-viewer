@@ -122,7 +122,14 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:var(--wide,760px);mar
 .eda-ox,.eda-fc{margin:4px 0 0;padding:0;list-style:none}
 .eda-ox li,.eda-fc li{padding:4px 0;border-top:1px dashed var(--line)}
 .eda-fc li::before{content:'・';color:var(--muted)}
-.eda-mk{display:inline-block;width:1.6em;font-weight:700}.eda-mk.good{color:var(--good)}.eda-mk.bad{color:var(--bad)}
+.eda-mk{display:inline-block;width:1.6em;font-weight:700}
+.eda-bl{margin:4px 0 0;padding-left:1.1em}.eda-bl li{margin:3px 0}
+.eda-tb{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px}
+.eda-tb{table-layout:fixed;min-width:0}.eda-tb th,.eda-tb td{border-bottom:1px solid var(--line);padding:5px 3px;text-align:right;word-break:break-all}
+.eda-tb th:first-child{text-align:left;color:var(--muted);font-weight:600}.eda-tb tr:first-child th{color:var(--muted);font-weight:600;font-size:12px}
+.eda-tb.c3 td:last-child{font-size:12px;color:var(--muted);text-align:left}
+.eda-kv{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0}
+.eda-kv div{background:var(--mid-soft);border-radius:8px;padding:6px 8px}.eda-kv span{display:block;font-size:11px;color:var(--muted)}.eda-kv b{font-size:15px}.eda-mk.good{color:var(--good)}.eda-mk.bad{color:var(--bad)}
 .eda-g.ga{color:var(--good)}.eda-g.gc{color:var(--muted)}.eda-g.gd{color:var(--bad)}
 .eda-line{grid-column:1/3;font-size:13px;line-height:1.5;background:var(--accent-soft);border-radius:6px;padding:5px 8px}
 .eda-line b{font-weight:700;margin-right:4px}
@@ -512,6 +519,37 @@ function edaLine(k){ const r=eda[k]; if(!r||!r.g) return '';
 const EDA_VERDICT={'競争優位性':['あり','弱い','なし'],'参入障壁':['高い','中','低い'],'高付加価値化':['できている','途上','できていない']};
 const EDA_GOOD=new Set(['あり','高い','できている','言える','良い','満たす']), EDA_BAD=new Set(['なし','低い','できていない','言えない','悪い','満たさない']);
 function edaBadge(w){ return `<span class="eda-bd ${EDA_GOOD.has(w)?'good':EDA_BAD.has(w)?'bad':'mid'}">${esc(w)}</span>` }
+// 括弧の中では切らずに「。」で文に分ける・「・」で並びに分ける
+function edaSplit(text, ch){ const out=[]; let d=0, cur=''; for(const c of String(text)){ if('（(「『'.includes(c)) d++; else if('）)」』'.includes(c)) d=Math.max(0,d-1); cur+=c; if(c===ch&&d===0){ out.push(cur); cur='' } } if(cur.trim()) out.push(cur); return out.map(x=>x.trim()).filter(Boolean) }
+const edaSent=t=>edaSplit(t,'。');
+function edaBullets(t){ const ss=edaSent(t); return ss.length>=2?'<ul class="eda-bl">'+ss.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':esc(t) }
+function edaLV(item){ const m=String(item).replace(/[・。]$/,'').match(/^([^\d−\-+]*?)\s*([−\-+]?[\d,.]+[^（(]*)(?:[（(]([^）)]*)[）)])?(.*)$/); return m?{l:m[1].trim(),v:m[2].trim(),n:((m[3]||'')+(m[4]||'')).trim()}:{l:item,v:'',n:''} }
+function edaForecast(body){
+  const k=body.search(/。(?=前提|主な前提)/); const fc=k>=0?body.slice(0,k):body.replace(/。$/,''); const rest=k>=0?body.slice(k+1):'';
+  const rows=fc.split('／').map(x=>x.trim()).map(x=>{ const m=x.match(/^(今期|来期|再来期)\s*([\s\S]*)$/); return m?{y:m[1],it:edaSplit(m[2],'・').map(s=>edaLV(s.replace(/・$/,'')))}:null }).filter(Boolean);
+  if(!rows.length) return null;
+  const labs=rows[0].it.map(x=>x.l);   // 縦＝項目、横＝今期・来期・再来期（スマホで横にはみ出さないように）
+  const tb='<table class="eda-tb"><tr><th></th>'+rows.map(r=>`<th>${esc(r.y)}</th>`).join('')+'</tr>'+labs.map((l,i)=>'<tr><th>'+esc(l)+'</th>'+rows.map(r=>{ const it=r.it.find(x=>x.l===l)||r.it[i]; return `<td>${esc(it?it.v:'')}</td>` }).join('')+'</tr>').join('')+'</table>';
+  return tb+(rest?edaBullets(rest):'');
+}
+function edaCompany(body){
+  const ss=edaSent(body); const s1=ss[0]||''; const i=s1.indexOf('会社予想は'); if(i<0) return null;
+  let tail=s1.slice(i+5).replace(/。$/,''); let after='';
+  const parts=edaSplit(tail,'、'); // 「…（前期72円）で、期初…」の「で、」で区切る
+  const j=parts.findIndex(x=>/で、$/.test(x)); if(j>=0){ after=parts.slice(j+1).join(''); tail=parts.slice(0,j+1).join('').replace(/で、$/,'') }
+  const items=edaSplit(tail,'・').map(x=>edaLV(x.replace(/・$/,''))).filter(x=>x.v);
+  if(items.length<2) return null;
+  const head=s1.slice(0,i).replace(/の$/,'');
+  const tb=(head?`<span class="eda-sub">${esc(head)}</span>`:'')+'<table class="eda-tb c3"><tr><th>項目</th><th>予想</th><th style="text-align:left">前期比など</th></tr>'+items.map(x=>`<tr><th>${esc(x.l)}</th><td>${esc(x.v)}</td><td>${esc(x.n)}</td></tr>`).join('')+'</table>';
+  const rest=(after?[after.replace(/。?$/,'。')]:[]).concat(ss.slice(1));
+  return tb+(rest.length?(rest.length>=2?'<ul class="eda-bl">'+rest.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':`<span class="eda-sub">${esc(rest[0])}</span>`):'');
+}
+const EDA_KV=['正常化純利益','正常化ROE','成長率','割引率','採用（2段階）','買い目安','1段階（参考）','残余利益モデル（参考）'];
+function edaKV(body){
+  const got=[]; for(const k of EDA_KV){ const re=new RegExp(k.replace(/[()（）]/g,m=>'\\'+m)+'[^\\d−\\-+、。]{0,4}([−\\-+]?[\\d,.]+(?:億円|兆円|円|%|倍)?)'); const m=body.match(re); if(m) got.push([k,m[1]]) }
+  if(got.length<3) return null;
+  return '<div class="eda-kv">'+got.map(([k,v])=>`<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')+'</div>'+edaBullets(body);
+}
 function edaFmtLine(lab, body){
   body=body.trim();
   // 先頭の判定語（言える／怪しい／言えない・良い／普通／悪い）を札に
@@ -527,13 +565,16 @@ function edaFmtLine(lab, body){
   } else if(/／/.test(body)){  // えだまめ予想：今期／来期／再来期
     const k=body.search(/。前提|。主な前提/); const fc=k>=0?body.slice(0,k+1):body; const rest=k>=0?body.slice(k+1):'';
     inner='<ul class="eda-fc">'+fc.replace(/。$/,'').split('／').map(x=>`<li>${esc(x.trim())}</li>`).join('')+'</ul>'+(rest?`<span class="eda-sub">${esc(rest)}</span>`:'');
-  } else inner=esc(body);
+  } else inner=edaBullets(body);
   return `<div class="eda-ln">${lab?`<span class="eda-lb">${esc(lab)}</span>`:''}${bd}<div class="eda-tx">${inner}</div></div>`;
 }
 function edaBody(head, body){
   body=String(body||'').trim(); let top='';
   const vs=EDA_VERDICT[head];
   if(vs){ const w=vs.slice().sort((a,b)=>b.length-a.length).find(v=>body.startsWith(v)); if(w){ top=edaBadge(w); body=body.slice(w.length).replace(/^[。、]\s*/,'') } }
+  if(head==='えだまめ予想'){ const h=edaForecast(body); if(h) return top+h }
+  if(head==='会社予想'){ const h=edaCompany(body); if(h) return top+h }
+  if(head==='適正株価の前提'){ const h=edaKV(body); if(h) return top+h }
   // 「ラベル：」で行に分ける（文の頭にある2〜10文字＋全角コロン）
   const re=/(^|[。\n])\s*([^。、：（）「」\n]{2,10})：/g; const cuts=[]; let mm;
   while((mm=re.exec(body))){ cuts.push({i:mm.index+mm[1].length, lab:mm[2].trim(), j:re.lastIndex}) }
