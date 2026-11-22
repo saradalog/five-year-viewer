@@ -637,6 +637,7 @@ function openDetail(c,push=true){
     <div class="dtitle"><h2>${esc(o.n)}</h2>
       <div class="cinfo">${o.s?`<span>${esc(o.s)}</span>`:''}<span>${esc(o.m)}</span><span>最新期 ${o.l||'—'}</span><span>${mkt==='jp'?'会計基準 ':'決算の通貨 '}${esc(o.ccy)}</span></div></div>
     <div class="row" style="justify-content:space-between"><span class="price" style="font-size:22px">${fmtPx(o.p)} <span class="sub">${M.px}（${M.date}）</span></span>${markBtns(o.c,mk)}</div>
+    ${edaDone(mkt+'_'+o.c)?`<div class="row eda-chk-top" style="justify-content:flex-end;margin-top:6px"><button class="back eda-chk-big" type="button" data-edachk="${esc(mkt+'_'+o.c)}" data-next="1" aria-pressed="${edaSeen(mkt+'_'+o.c)}">${edaSeen(mkt+'_'+o.c)?'✓ チェック済み（押すと戻す）':'見た！チェックして次へ'}</button></div>`:''}
     <div class="panel memo-panel"><h3><label for="memo">自分のメモ</label></h3>
       <textarea id="memo" rows="4" placeholder="気づいたこと、監視に入れる理由、確かめたいことなど">${esc(notes[mkt+'_'+o.c]||'')}</textarea>
       <p class="note" id="memoSt"></p></div>
@@ -670,7 +671,9 @@ function edaToggle(k,fromDetail){
     apply();   // 一覧を作り直す（チェックした会社は「未チェック」から消える）
     if(nxt){ openDetail(nxt.c,false); toast('チェックしました') }
     else if(on&&st.f.has('eda')){ toast('チェックしました（最後の1社でした）'); if(location.hash==='#detail') history.back(); else closeDetail() }
-    else { const old=document.querySelector('#dbody .eda-panel'); if(old) old.outerHTML=edaPanel(cur); toast(on?'チェックしました':'チェックを外しました') }
+    else { const old=document.querySelector('#dbody .eda-panel'); if(old) old.outerHTML=edaPanel(cur);
+      document.querySelectorAll('#dbody .eda-chk-top .eda-chk-big').forEach(bt=>{ const sn=edaSeen(k); bt.setAttribute('aria-pressed',String(sn)); bt.textContent=sn?'✓ チェック済み（押すと戻す）':'見た！チェックして次へ' });
+      toast(on?'チェックしました':'チェックを外しました') }
   } else {
     if(st.f.has('eda')||st.f.has('edaSeen')){ const card=document.querySelector(`.card[data-c="${CSS.escape(c)}"]`); if(card) card.remove(); view=view.filter(x=>x.c!==c); document.getElementById('count').textContent=`${fmt(view.length)}社 / ${fmt((DATA[mkt]||[]).length)}社` }
     else { const card=document.querySelector(`.card[data-c="${CSS.escape(c)}"]`); const o=(DATA[mkt]||[]).find(x=>x.c===c); if(card&&o) card.outerHTML=cardHTML(o) }
