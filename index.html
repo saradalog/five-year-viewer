@@ -71,6 +71,7 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:var(--wide,760px);mar
 .cname{display:flex;gap:8px;align-items:baseline;min-width:0}
 .code{font-family:var(--font-num);font-size:13px;color:var(--muted);flex:none}
 .name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name .en,.dtitle h2 .en{font-weight:400;font-size:.78em;color:var(--muted);margin-left:.5em}
 .cinfo{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
 .pills{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .pill{font-size:12px;border-radius:6px;padding:1px 7px;background:var(--mid-soft);white-space:nowrap}
@@ -370,7 +371,7 @@ function ratioClass(r){return r==null?'':r<0.8?'good':r>1.25?'bad':''}
 function apply(){
   const all=DATA[mkt]||[]; const q=st.q.trim().toLowerCase();
   let v=all.filter(o=>{
-    if(q && !o.key.includes(q) && !(((notes[mkt+'_'+o.c]||'')+' '+(biz[mkt+'_'+o.c]||'')+' '+(TB.geo.data[mkt+'_'+o.c]||'')+' '+(TB.comp.data[mkt+'_'+o.c]||'')).toLowerCase().includes(q))) return false;
+    if(q && !o.key.includes(q) && !jpName(o).toLowerCase().includes(q) && !(((notes[mkt+'_'+o.c]||'')+' '+(biz[mkt+'_'+o.c]||'')+' '+(TB.geo.data[mkt+'_'+o.c]||'')+' '+(TB.comp.data[mkt+'_'+o.c]||'')).toLowerCase().includes(q))) return false;
     const f=st.f;
     if(f.has('cheapFv')&&!(o.rfv!=null&&o.rfv<1)) return false;
     if(f.has('cheapFa')&&!(o.rfa!=null&&o.rfa<1)) return false;
@@ -418,7 +419,7 @@ function cardHTML(o){
   const ed=eda[k]; const p3=ed&&ed.g?`<span class="pill eda">えだまめ <b>${esc(ed.g)}</b>（参考）</span>`:'';
   return `<article class="card ${mk?'m-'+mk:''}" data-c="${o.c}">
     <button class="ctap" type="button" data-open="${o.c}">
-      <span class="cname"><span class="code">${o.c}</span><span class="name">${esc(o.n)}</span></span>
+      <span class="cname"><span class="code">${o.c}</span><span class="name">${nameHTML(o)}</span></span>
       <span class="cinfo">${o.s?`<span>${esc(o.s)}</span>`:''}<span>${esc(o.m)}</span><span>時価総額 ${fmtMoney(o.mc)} ${MK[mkt].mc}</span></span>
       <span class="pills">${p1}${p2}${p3}</span>
     </button>
@@ -512,8 +513,8 @@ function edaOrder(){ // 分析日が新しい順。同じ日はシートの下�
   ks.map((k,i)=>[k,String(eda[k].d||'').replace(/\D/g,''),i]).sort((x,y)=>x[1]===y[1]?x[2]-y[2]:(x[1]<y[1]?-1:1)).forEach((x,i)=>o[x[0]]=i);
   return o }
 // えだまめの10年後テストが「言える」（10年後も同じ商売で今以上に稼いでいると言える）会社
-function eda10(k){ const r=eda[k]; return !!(r&&/10年後テスト[：:]\s*言える/.test(r.t||'')) }
-function edaCount(){ { const e=document.getElementById('n-eda10'); if(e){ const n=Object.keys(eda).filter(k=>k.startsWith(mkt+'_')&&eda10(k)).length; e.textContent=n?n+'社':'' } } const ks=Object.keys(eda).filter(k=>k.startsWith(mkt+'_')&&edaDone(k)); const seen=ks.filter(edaSeen).length;
+function eda10(k){ if(ten[k]&&ten[k].r) return ten[k].r==='言える'; const r=eda[k]; return !!(r&&/10年後テスト[：:]\s*言える/.test(r.t||'')) }
+function edaCount(){ { const e=document.getElementById('n-eda10'); if(e){ const n=[...new Set([...Object.keys(eda),...Object.keys(ten)])].filter(k=>k.startsWith(mkt+'_')&&eda10(k)).length; e.textContent=n?n+'社':'' } } const ks=Object.keys(eda).filter(k=>k.startsWith(mkt+'_')&&edaDone(k)); const seen=ks.filter(edaSeen).length;
   const a=document.getElementById('n-eda'), b=document.getElementById('n-edaSeen'); if(a) a.textContent=(ks.length-seen)?(ks.length-seen)+'社':''; if(b) b.textContent=seen?seen+'社':'' }
 const edaNum=v=>{ const n=Number(String(v??'').replace(/[,円]/g,'')); return v==null||v===''||isNaN(n)?null:n };
 function edaLine(k){ const r=eda[k]; if(!r||!r.g) return '';
@@ -607,8 +608,10 @@ function edaSecs(text){
   const parts=t.split(/\n+(?=【[^】]{1,20}】)/).map(x=>x.trim()).filter(Boolean);
   return parts.map(x=>{ const m=x.match(/^【([^】]+)】\s*([\s\S]*)$/); return m?`<div class="eda-sec"><b>${esc(m[1])}</b>${edaBody(m[1],m[2])}</div>`:`<div class="eda-sec">${edaBody('',x)}</div>` }).join('') }
 function edaPanel(o){
-  const r=eda[mkt+'_'+o.c]; if(!r) return '';
-  const px=v=>{ const n=edaNum(v); return n==null?'—':fmt(n,0)+'円' };
+  const k0=mkt+'_'+o.c, r=eda[k0], tn=ten[k0];
+  const tenBox=tn&&tn.r?`<div class="eda-sec"><b>10年後テスト（${esc(tn.w||'一次判定')}）</b><p><b>${esc(tn.r)}</b>　${esc(tn.y||'')}</p>${tn.d?`<p class="note">判定日 ${esc(tn.d)}</p>`:''}</div>`:'';
+  if(!r) return tenBox?`<div class="panel eda-panel"><h3>えだまめの10年後テスト（参考）</h3>${tenBox}${tn.r==='言える'?'<p class="note">「言える」なので、このあと詳しい分析をします。</p>':'<p class="note">「言える」ではないので、詳しい分析はしません。</p>'}</div>`:'';
+  const px=v=>{ const n=edaNum(v); return n==null?'—':fmt(n,mkt==='jp'?0:2)+MK[mkt].px };
   const gc={A:'ga',B:'',C:'gc',D:'gd'}[r.g]||'';
   return `<div class="panel eda-panel"><h3>えだまめの分析（参考）</h3>
     <div class="eda-top"><span class="eda-g ${gc}">${esc(r.g||'—')}</span>${r.c?`<span><b>${esc(r.c)}</b></span>`:''}</div>
@@ -638,7 +641,7 @@ function openDetail(c,push=true){
   document.getElementById('dsub').textContent=`${M.label} · ${o.c}`+(vi>=0?`（${vi+1}/${view.length}）`:'');
   document.getElementById('dprev').disabled=!(vi>0); document.getElementById('dnext').disabled=!(vi>=0&&vi<view.length-1);
   document.getElementById('dbody').innerHTML=`
-    <div class="dtitle"><h2>${esc(o.n)}</h2>
+    <div class="dtitle"><h2>${nameHTML(o)}</h2>
       <div class="cinfo">${o.s?`<span>${esc(o.s)}</span>`:''}<span>${esc(o.m)}</span><span>最新期 ${o.l||'—'}</span><span>${mkt==='jp'?'会計基準 ':'決算の通貨 '}${esc(o.ccy)}</span></div></div>
     <div class="row" style="justify-content:space-between"><span class="price" style="font-size:22px">${fmtPx(o.p)} <span class="sub">${M.px}（${M.date}）</span></span>${markBtns(o.c,mk)}</div>
     ${edaDone(mkt+'_'+o.c)?`<div class="row eda-chk-top" style="justify-content:flex-end;margin-top:6px"><button class="back eda-chk-big" type="button" data-edachk="${esc(mkt+'_'+o.c)}" data-next="1" aria-pressed="${edaSeen(mkt+'_'+o.c)}">${edaSeen(mkt+'_'+o.c)?'✓ チェック済み（押すと戻す）':'見た！チェックして次へ'}</button></div>`:''}
@@ -703,6 +706,11 @@ let pendNotes={}; try{pendNotes=JSON.parse(localStorage.getItem('fyv-pending-not
 let noteOld=false;
 let eda={}; try{eda=JSON.parse(localStorage.getItem('fyv-eda')||'{}')}catch(e){}  // えだまめの分析（参考）。key -> {g,c,fv,buy,px,t,d,s,m,n}
 function edaSave(){try{localStorage.setItem('fyv-eda',JSON.stringify(eda))}catch(e){}}
+let ten={}; try{ten=JSON.parse(localStorage.getItem('fyv-ten')||'{}')}catch(e){}  // えだまめの10年後テスト。key -> {n:日本語の銘柄名, r:言える/怪しい/言えない, y:理由, d:判定日, w:どこで判定}
+function tenSave(){try{localStorage.setItem('fyv-ten',JSON.stringify(ten))}catch(e){}}
+// 米国・香港の日本語の銘柄名（えだまめが付けたもの。無ければ空）
+function jpName(o){ if(mkt==='jp') return ''; const k=mkt+'_'+o.c; const v=(eda[k]&&eda[k].nm)||(ten[k]&&ten[k].n)||''; return /[\u3040-\u30ff\u4e00-\u9fff]/.test(v)&&v!==o.n?v:'' }
+function nameHTML(o){ const j=jpName(o); return j?`${esc(j)}<span class="en">${esc(o.n)}</span>`:esc(o.n) }
 // 表のメモ（事業ごと・販売国ごと）。1行＝名前・数字・メモ。スプレッドシートには1行ずつ「名前 | 数字 | メモ」で保存
 const TB={
   biz:{col:'事業メモ',title:'事業ごとのメモ',nameP:'事業名・製品',numP:'数字',memoP:'メモ（伸びる理由、単価・数量、シェアなど）',empty:'「＋ 行を追加」で、事業や製品ごとのメモを書けます。'},
@@ -771,7 +779,7 @@ function setNote(c,text){
 function tbTemplate(kind,o){
   const e=o.ex||{};
   if(kind==='biz') return (e.seg||[]).filter(x=>x[0]).map(x=>({n:x[0],v:'',m:''}));
-  if(kind==='comp'){ const S=lastVal(o.f[0]); return [{n:o.n+'（自社）',v:S!=null?fmtMoney(S)+' '+MK[mkt].money(o.ccy):'',s:'',m:''}] }
+  if(kind==='comp'){ const S=lastVal(o.f[0]); return [{n:(jpName(o)||o.n)+'（自社）',v:S!=null?fmtMoney(S)+' '+MK[mkt].money(o.ccy):'',s:'',m:''}] }
   if(kind==='geo'&&e.ov!=null) return [{n:'日本',v:String(Math.round((100-e.ov)*10)/10),m:''},{n:'海外',v:String(e.ov),m:''}].filter(r=>+r.v>0||r.n==='日本');
   return [];
 }
@@ -831,6 +839,7 @@ async function syncMarks(){
     if(st.f.has('eda')||st.f.has('edaSeen')) apply(); else edaCount();
     if(j.edaSeen){ const r={...j.edaSeen}; for(const [k,v] of Object.entries(pendSeen)){ if(v) r[k]=v; else delete r[k] } edaChk=r; seenOld=false; seenSave(); edaCount() }
     else seenOld=true;
+    if(j.ten&&JSON.stringify(j.ten)!==JSON.stringify(ten)){ ten=j.ten; tenSave(); edaRefresh(); if(st.f.has('eda10')) apply(); else edaCount() }
     if(j.eda&&JSON.stringify(j.eda)!==JSON.stringify(eda)){ eda=j.eda; edaSave(); edaRefresh(); if(st.f.has('eda')||st.f.has('edaSeen')||st.f.has('eda10')||st.sort==='eda'||st.sort==='edag') apply(); else edaCount() }
     if(cur&&!document.querySelector('.tb :focus')) renderBizNotes(cur);
     notesSave(); DATA_notes_refresh();
