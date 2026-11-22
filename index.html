@@ -125,8 +125,9 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:var(--wide,760px);mar
 .eda-mk{display:inline-block;width:1.6em;font-weight:700}
 .eda-bl{margin:4px 0 0;padding-left:1.1em}.eda-bl li{margin:3px 0}
 .eda-tb{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px}
-.eda-tb{table-layout:fixed;min-width:0}.eda-tb th,.eda-tb td{border-bottom:1px solid var(--line);padding:5px 3px;text-align:right;word-break:break-all}
+.eda-tb{table-layout:fixed;min-width:0}.eda-tb th,.eda-tb td{border-bottom:1px solid var(--line);padding:5px 3px;text-align:right;word-break:break-all;white-space:normal}
 .eda-tb th:first-child{text-align:left;color:var(--muted);font-weight:600}.eda-tb tr:first-child th{color:var(--muted);font-weight:600;font-size:12px}
+.eda-h2{font-size:13px;color:var(--ink)}.eda-blk{margin:6px 0}
 .eda-tb.c3 td:last-child{font-size:12px;color:var(--muted);text-align:left}
 .eda-kv{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0}
 .eda-kv div{background:var(--mid-soft);border-radius:8px;padding:6px 8px}.eda-kv span{display:block;font-size:11px;color:var(--muted)}.eda-kv b{font-size:15px}.eda-mk.good{color:var(--good)}.eda-mk.bad{color:var(--bad)}
@@ -532,17 +533,29 @@ function edaForecast(body){
   const tb='<table class="eda-tb"><tr><th></th>'+rows.map(r=>`<th>${esc(r.y)}</th>`).join('')+'</tr>'+labs.map((l,i)=>'<tr><th>'+esc(l)+'</th>'+rows.map(r=>{ const it=r.it.find(x=>x.l===l)||r.it[i]; return `<td>${esc(it?it.v:'')}</td>` }).join('')+'</tr>').join('')+'</table>';
   return tb+(rest?edaBullets(rest):'');
 }
+// 「売上高○億円（前期比+x%）・営業利益…」の並びを表にする（1文ごと。並びが3つ以上ある文だけ）
+function edaItemsTable(sent){
+  const t=sent.replace(/。$/,''); const st=t.search(/(売上高|売上収益|営業収益|経常収益|営業利益|事業利益|経常利益|純利益|EPS|1株利益|配当|ROE|ROIC)/);
+  if(st<0) return null;
+  let tail=t.slice(st), after='';
+  const parts=edaSplit(tail,'、'); const j=parts.findIndex(x=>/で、$/.test(x));
+  if(j>=0){ after=parts.slice(j+1).join(''); tail=parts.slice(0,j+1).join('').replace(/で、$/,'') }
+  const items=edaSplit(tail,'・').map(x=>edaLV(x.replace(/・$/,''))).filter(x=>x.v&&x.l);
+  if(items.length<3) return null;
+  const head=t.slice(0,st).replace(/(の目標)?は$/,m=>m.replace(/は$/,'')).trim();
+  const note=items.some(x=>x.n);
+  const tb=(head?`<span class="eda-sub"><b class="eda-h2">${esc(head)}</b></span>`:'')+`<table class="eda-tb ${note?'c3':''}">`+items.map(x=>`<tr><th>${esc(x.l)}</th><td>${esc(x.v)}</td>${note?`<td>${esc(x.n)}</td>`:''}</tr>`).join('')+'</table>';
+  return tb+(after?`<span class="eda-sub">${esc(after.replace(/。?$/,'。'))}</span>`:'');
+}
 function edaCompany(body){
-  const ss=edaSent(body); const s1=ss[0]||''; const i=s1.indexOf('会社予想は'); if(i<0) return null;
-  let tail=s1.slice(i+5).replace(/。$/,''); let after='';
-  const parts=edaSplit(tail,'、'); // 「…（前期72円）で、期初…」の「で、」で区切る
-  const j=parts.findIndex(x=>/で、$/.test(x)); if(j>=0){ after=parts.slice(j+1).join(''); tail=parts.slice(0,j+1).join('').replace(/で、$/,'') }
-  const items=edaSplit(tail,'・').map(x=>edaLV(x.replace(/・$/,''))).filter(x=>x.v);
-  if(items.length<2) return null;
-  const head=s1.slice(0,i).replace(/の$/,'');
-  const tb=(head?`<span class="eda-sub">${esc(head)}</span>`:'')+'<table class="eda-tb c3"><tr><th>項目</th><th>予想</th><th style="text-align:left">前期比など</th></tr>'+items.map(x=>`<tr><th>${esc(x.l)}</th><td>${esc(x.v)}</td><td>${esc(x.n)}</td></tr>`).join('')+'</table>';
-  const rest=(after?[after.replace(/。?$/,'。')]:[]).concat(ss.slice(1));
-  return tb+(rest.length?(rest.length>=2?'<ul class="eda-bl">'+rest.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':`<span class="eda-sub">${esc(rest[0])}</span>`):'');
+  const ss=edaSent(body); let any=false; const out=[];
+  for(const x of ss){ const h=edaItemsTable(x); if(h){ any=true; out.push(`<div class="eda-blk">${h}</div>`) } else out.push(`<li>${esc(x)}</li>`) }
+  if(!any) return null;
+  // 表でない文は続けて箇条書きにまとめる
+  let html='', ul=[];
+  const flush=()=>{ if(ul.length){ html+='<ul class="eda-bl">'+ul.join('')+'</ul>'; ul=[] } };
+  for(const o of out){ if(o.startsWith('<li>')) ul.push(o); else { flush(); html+=o } }
+  flush(); return html;
 }
 const EDA_KV=['正常化純利益','正常化ROE','成長率','割引率','採用（2段階）','買い目安','1段階（参考）','残余利益モデル（参考）'];
 function edaKV(body){
@@ -587,7 +600,7 @@ function edaBody(head, body){
 }
 function edaSecs(text){
   const t=String(text||'').trim(); if(!t) return '';
-  const parts=t.split(/(?=【[^】]{1,20}】)/).map(x=>x.trim()).filter(Boolean);
+  const parts=t.split(/\n+(?=【[^】]{1,20}】)/).map(x=>x.trim()).filter(Boolean);
   return parts.map(x=>{ const m=x.match(/^【([^】]+)】\s*([\s\S]*)$/); return m?`<div class="eda-sec"><b>${esc(m[1])}</b>${edaBody(m[1],m[2])}</div>`:`<div class="eda-sec">${edaBody('',x)}</div>` }).join('') }
 function edaPanel(o){
   const r=eda[mkt+'_'+o.c]; if(!r) return '';
