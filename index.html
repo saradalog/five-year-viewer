@@ -225,6 +225,7 @@ body{overflow-x:hidden}
   <div class="chips" role="group" aria-label="絞り込み">
     <button class="chip" type="button" data-f="eda" aria-pressed="false">えだまめ未チェック<span class="n" id="n-eda"></span></button>
     <button class="chip" type="button" data-f="edaSeen" aria-pressed="false">チェック済み<span class="n" id="n-edaSeen"></span></button>
+    <button class="chip" type="button" data-f="eda10" aria-pressed="false">10年後も稼げる<span class="n" id="n-eda10"></span></button>
     <button class="chip" type="button" data-f="cheapFv" aria-pressed="false">理論より安い</button>
     <button class="chip" type="button" data-f="cheapFa" aria-pressed="false">適正より安い</button>
     <button class="chip" type="button" data-f="growth" aria-pressed="false">毎年増収</button>
@@ -380,6 +381,7 @@ function apply(){
     if(f.has('ov30')&&!(o.ov!=null&&o.ov>=30)) return false;
     if(f.has('rs')&&!(o.ex&&o.ex.rs)) return false;
     if(f.has('eda')&&!(edaDone(mkt+'_'+o.c)&&!edaSeen(mkt+'_'+o.c))) return false;
+    if(f.has('eda10')&&!eda10(mkt+'_'+o.c)) return false;
     if(f.has('edaSeen')&&!(edaDone(mkt+'_'+o.c)&&edaSeen(mkt+'_'+o.c))) return false;
     if(f.has('memo')&&!notes[mkt+'_'+o.c]&&!biz[mkt+'_'+o.c]&&!TB.geo.data[mkt+'_'+o.c]&&!TB.comp.data[mkt+'_'+o.c]) return false;
     const mk=marks[mkt+'_'+o.c];
@@ -509,7 +511,9 @@ function edaOrder(){ // 分析日が新しい順。同じ日はシートの下�
   const ks=Object.keys(eda); const o={};
   ks.map((k,i)=>[k,String(eda[k].d||'').replace(/\D/g,''),i]).sort((x,y)=>x[1]===y[1]?x[2]-y[2]:(x[1]<y[1]?-1:1)).forEach((x,i)=>o[x[0]]=i);
   return o }
-function edaCount(){ const ks=Object.keys(eda).filter(k=>k.startsWith(mkt+'_')&&edaDone(k)); const seen=ks.filter(edaSeen).length;
+// えだまめの10年後テストが「言える」（10年後も同じ商売で今以上に稼いでいると言える）会社
+function eda10(k){ const r=eda[k]; return !!(r&&/10年後テスト[：:]\s*言える/.test(r.t||'')) }
+function edaCount(){ { const e=document.getElementById('n-eda10'); if(e){ const n=Object.keys(eda).filter(k=>k.startsWith(mkt+'_')&&eda10(k)).length; e.textContent=n?n+'社':'' } } const ks=Object.keys(eda).filter(k=>k.startsWith(mkt+'_')&&edaDone(k)); const seen=ks.filter(edaSeen).length;
   const a=document.getElementById('n-eda'), b=document.getElementById('n-edaSeen'); if(a) a.textContent=(ks.length-seen)?(ks.length-seen)+'社':''; if(b) b.textContent=seen?seen+'社':'' }
 const edaNum=v=>{ const n=Number(String(v??'').replace(/[,円]/g,'')); return v==null||v===''||isNaN(n)?null:n };
 function edaLine(k){ const r=eda[k]; if(!r||!r.g) return '';
@@ -827,7 +831,7 @@ async function syncMarks(){
     if(st.f.has('eda')||st.f.has('edaSeen')) apply(); else edaCount();
     if(j.edaSeen){ const r={...j.edaSeen}; for(const [k,v] of Object.entries(pendSeen)){ if(v) r[k]=v; else delete r[k] } edaChk=r; seenOld=false; seenSave(); edaCount() }
     else seenOld=true;
-    if(j.eda&&JSON.stringify(j.eda)!==JSON.stringify(eda)){ eda=j.eda; edaSave(); edaRefresh(); if(st.f.has('eda')||st.f.has('edaSeen')||st.sort==='eda'||st.sort==='edag') apply(); else edaCount() }
+    if(j.eda&&JSON.stringify(j.eda)!==JSON.stringify(eda)){ eda=j.eda; edaSave(); edaRefresh(); if(st.f.has('eda')||st.f.has('edaSeen')||st.f.has('eda10')||st.sort==='eda'||st.sort==='edag') apply(); else edaCount() }
     if(cur&&!document.querySelector('.tb :focus')) renderBizNotes(cur);
     notesSave(); DATA_notes_refresh();
     document.querySelectorAll('.card').forEach(el=>refreshMark(el.dataset.c)); if(cur) refreshMark(cur.c);
@@ -905,7 +909,7 @@ document.getElementById('sort').addEventListener('change',e=>{st.sort=e.target.v
 document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{
   if(b.dataset.f){const f=b.dataset.f; st.f.has(f)?st.f.delete(f):st.f.add(f); b.setAttribute('aria-pressed',String(st.f.has(f)))
     if(f==='eda'||f==='edaSeen'){ const other=f==='eda'?'edaSeen':'eda'; if(st.f.has(f)&&st.f.has(other)){ st.f.delete(other); document.querySelector(`.chip[data-f="${other}"]`).setAttribute('aria-pressed','false') } }
-    if(f==='eda'||f==='edaSeen'){ const sel=document.getElementById('sort'); const anyE=st.f.has('eda')||st.f.has('edaSeen'); if(anyE&&st.sort==='code'){st.sort='eda'; sel.value='eda'} else if(!anyE&&(st.sort==='eda'||st.sort==='edag')){st.sort='code'; sel.value='code'} } }
+    if(f==='eda'||f==='edaSeen'||f==='eda10'){ const sel=document.getElementById('sort'); const anyE=st.f.has('eda')||st.f.has('edaSeen')||st.f.has('eda10'); if(anyE&&st.sort==='code'){st.sort='eda'; sel.value='eda'} else if(!anyE&&(st.sort==='eda'||st.sort==='edag')){st.sort='code'; sel.value='code'} } }
   else{const m=b.dataset.m; st.m=st.m===m?null:m; document.querySelectorAll('.chip[data-m]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.m===st.m)))}
   apply();
 }));
