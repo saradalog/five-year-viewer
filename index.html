@@ -579,7 +579,13 @@ function edaFmtLine(lab, body){
     const k=body.indexOf('。'); const head=k>=0?body.slice(0,k+1):''; const rest=k>=0?body.slice(k+1):body;
     const q=head.match(/「(満たす|一部|満たさない)」/); if(q) bd=edaBadge(q[1]);
     const items=rest.replace(/。\s*$/,'').split(/(?<=[○×])、/).map(x=>x.trim()).filter(Boolean);
-    inner=(head?`<span class="eda-sub">${esc(head)}</span>`:'')+'<ul class="eda-ox">'+items.map(x=>{ const ok=/○$/.test(x); return `<li><span class="eda-mk ${ok?'good':'bad'}">${ok?'○':'×'}</span>${esc(x.replace(/[○×]$/,''))}</li>` }).join('')+'</ul>';
+    // 各項目の○×は「項目の文のすぐ後ろ（。か文末の前）」の印。最後の項目の「○。」より後ろの文は一覧の下に出す
+    let tail='';
+    const lis=items.map(x=>{ const m=x.match(/^([\s\S]*?)([○×])(?:[。、]\s*([\s\S]*))?$/);
+      if(!m) return `<li><span class="eda-mk">・</span>${esc(x)}</li>`;
+      if(m[3]) tail+=(tail?' ':'')+m[3];
+      const ok=m[2]==='○'; return `<li><span class="eda-mk ${ok?'good':'bad'}">${m[2]}</span>${esc(m[1].replace(/[でが、]\s*$/,''))}</li>` });
+    inner=(head?`<span class="eda-sub">${esc(head)}</span>`:'')+'<ul class="eda-ox">'+lis.join('')+'</ul>'+(tail?`<span class="eda-sub">${esc(tail)}</span>`:'');
   } else if(/／/.test(body)){  // えだまめ予想：今期／来期／再来期
     const k=body.search(/。前提|。主な前提/); const fc=k>=0?body.slice(0,k+1):body; const rest=k>=0?body.slice(k+1):'';
     inner='<ul class="eda-fc">'+fc.replace(/。$/,'').split('／').map(x=>`<li>${esc(x.trim())}</li>`).join('')+'</ul>'+(rest?`<span class="eda-sub">${esc(rest)}</span>`:'');
