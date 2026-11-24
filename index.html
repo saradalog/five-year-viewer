@@ -71,6 +71,8 @@ main{padding:10px 16px 40px;display:grid;gap:8px;max-width:var(--wide,760px);mar
 .cname{display:flex;gap:8px;align-items:baseline;min-width:0}
 .code{font-family:var(--font-num);font-size:13px;color:var(--muted);flex:none}
 .name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eda-kasegi{background:var(--paper);border-radius:10px;padding:10px 12px;margin:4px 0 12px}
+.eda-kasegi>b{display:block;margin-bottom:4px}
 .name .en,.dtitle h2 .en{font-weight:400;font-size:.78em;color:var(--muted);margin-left:.5em}
 .cinfo{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
 .pills{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -615,17 +617,27 @@ function edaSecs(text){
   const t=String(text||'').trim(); if(!t) return '';
   const parts=t.split(/\n+(?=【[^】]{1,20}】)/).map(x=>x.trim()).filter(Boolean);
   return parts.map(x=>{ const m=x.match(/^【([^】]+)】\s*([\s\S]*)$/); return m?`<div class="eda-sec"><b>${esc(m[1])}</b>${edaBody(m[1],m[2])}</div>`:`<div class="eda-sec">${edaBody('',x)}</div>` }).join('') }
+// 要点から【稼ぎ方】を取り出す（一番上に別枠で出すため）
+function edaKasegi(t){
+  const parts=String(t||'').trim().split(/\n+(?=【[^】]{1,20}】)/);
+  const i=parts.findIndex(x=>/^【稼ぎ方】/.test(x.trim()));
+  if(i<0) return {k:'',rest:t||''};
+  const k=parts[i].trim().replace(/^【稼ぎ方】\s*/,''); parts.splice(i,1);
+  return {k, rest:parts.join('\n')};
+}
 function edaPanel(o){
   const k0=mkt+'_'+o.c, r=eda[k0], tn=ten[k0];
   const tenBox=tn&&tn.r?`<div class="eda-sec"><b>10年後テスト（${esc(tn.w||'一次判定')}）</b><p><b>${esc(tn.r)}</b>　${esc(tn.y||'')}</p>${tn.d?`<p class="note">判定日 ${esc(tn.d)}</p>`:''}</div>`:'';
   if(!r) return tenBox?`<div class="panel eda-panel"><h3>えだまめの10年後テスト（参考）</h3>${tenBox}${tn.r==='言える'?'<p class="note">「言える」なので、このあと詳しい分析をします。</p>':'<p class="note">「言える」ではないので、詳しい分析はしません。</p>'}</div>`:'';
   const px=v=>{ const n=edaNum(v); return n==null?'—':fmt(n,mkt==='jp'?0:2)+MK[mkt].px };
   const gc={A:'ga',B:'',C:'gc',D:'gd'}[r.g]||'';
+  const ks=edaKasegi(r.t);
   return `<div class="panel eda-panel"><h3>えだまめの分析（参考）</h3>
+    ${ks.k?`<div class="eda-kasegi"><b>どうやって稼いでいるか</b>${edaBody('稼ぎ方',ks.k)}</div>`:''}
     <div class="eda-top"><span class="eda-g ${gc}">${esc(r.g||'—')}</span>${r.c?`<span><b>${esc(r.c)}</b></span>`:''}</div>
     <div class="cinfo"><span>適正株価 ${px(r.fv)}</span><span>買い目安 ${px(r.buy)}</span><span>分析時の株価 ${px(r.px)}</span></div>
     ${(r.o||r.p||r.q)?`<div class="cinfo">${r.o?`<span>点数（定量） <b>${esc(r.o)}</b>/100</span>`:''}${r.p?`<span>定量判定 <b>${esc(r.p)}</b></span>`:''}${r.q?`<span>数字の照合 ${esc(r.q)}</span>`:''}</div>`:''}
-    ${r.t?`<details open><summary>要点</summary>${edaSecs(r.t)}</details>`:''}
+    ${ks.rest?`<details open><summary>要点</summary>${edaSecs(ks.rest)}</details>`:''}
     ${r.m?`<details><summary>事業と市場</summary>${edaSecs(r.m)}</details>`:''}
     ${r.n?`<details><summary>独自の視点</summary>${edaSecs(r.n)}</details>`:''}
     ${edaDone(mkt+'_'+o.c)?`<div class="row" style="margin-top:10px"><button class="back eda-chk-big" type="button" data-edachk="${esc(mkt+'_'+o.c)}" data-next="1" aria-pressed="${edaSeen(mkt+'_'+o.c)}">${edaSeen(mkt+'_'+o.c)?'✓ チェック済み（押すと戻す）':'見た！チェックして次へ'}</button></div>`:'<p class="note">この分析は新しい項目（会社予想・えだまめ予想など）が入る前のもので、書き直し待ちです。</p>'}
